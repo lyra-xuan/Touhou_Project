@@ -48,6 +48,11 @@ _MUSIC_FILES: dict[str, list[str]] = {
 
 _MUSIC_VOLUME = 0.5
 
+# 单独压低音量的音效：Enter 确认音（menu_ok）连按时会显吵，调小一档
+_SOUND_VOLUME = {
+    "menu_ok": 0.45,
+}
+
 
 class Audio:
     """按名字播放音效与循环背景音乐；任何环节失败都只是少一段声音。"""
@@ -66,9 +71,13 @@ class Audio:
         self.music_ready = True
         for name, filename in _SOUND_FILES.items():
             try:
-                self.sounds[name] = pygame.mixer.Sound(str(_AUDIO_ROOT / filename))
+                sound = pygame.mixer.Sound(str(_AUDIO_ROOT / filename))
             except (pygame.error, OSError):
                 continue
+            volume = _SOUND_VOLUME.get(name)
+            if volume is not None:
+                sound.set_volume(volume)
+            self.sounds[name] = sound
 
     def play(self, name: str) -> None:
         sound = self.sounds.get(name)

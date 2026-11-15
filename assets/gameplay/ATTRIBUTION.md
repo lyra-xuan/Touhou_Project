@@ -28,6 +28,9 @@ Images (`CM_DAT` = character/bullet data, `ST_DAT` = stage data,
 - `ending-defeat.jpg`: `ED_DAT/end00.jpg`
 - `ending-afterword.jpg`: `ED_DAT/end01.jpg` (original ending-scene illustration)
 - `ending-credits.jpg`: `ED_DAT/staff00.jpg` (original staff-roll background)
+- `ending-roll-1.jpg` ~ `ending-roll-6.jpg`: `ED_DAT/end02.jpg`, `end05.jpg`,
+  `end06.jpg`, `end08.jpg`, `end10.jpg`, `end12.jpg` (original ending
+  illustrations, cycled behind the scrolling staff roll)
 - `result-screen.jpg`: `TL_DAT/result.jpg` (original score/result screen artwork)
 
 ## Three-stage expansion

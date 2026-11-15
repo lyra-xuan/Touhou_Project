@@ -75,6 +75,20 @@ def _build_vignette(size: tuple[int, int]) -> pygame.Surface:
     return overlay
 
 
+def _cover_scale(surface: pygame.Surface,
+                 size: tuple[int, int]) -> pygame.Surface:
+    """等比缩放后居中裁切，让画面铺满目标尺寸（背景図鑑的预览框用）。"""
+    target_w, target_h = size
+    src_w, src_h = surface.get_size()
+    scale = max(target_w / src_w, target_h / src_h)
+    scaled = pygame.transform.smoothscale(
+        surface, (max(1, round(src_w * scale)), max(1, round(src_h * scale)))
+    )
+    rect = pygame.Rect(0, 0, target_w, target_h)
+    rect.center = scaled.get_rect().center
+    return scaled.subsurface(rect).copy()
+
+
 def _flash_sprite(sprite: pygame.Surface, amount: float) -> pygame.Surface:
     """把贴图整体加亮，用于 Boss 受击闪白；alpha 通道保持不变。"""
     frame = sprite.copy()
@@ -139,6 +153,29 @@ class Game:
     SCENE_CG_GALLERY = "cg_gallery"
     CHEAT_PASSWORD = "472977"          # 作弊模式解锁密码
     ENDING_PAGES = ("result", "afterword", "afterword", "afterword", "credits")
+    CREDITS_SCROLL_SECONDS = 7.0       # 謝辞页滚动名单滚完全程所需秒数
+    # 人物録页籤顺序：Tab 依次轮转
+    GALLERY_TABS = ("人物図鑑", "背景図鑑", "音楽室")
+    # 背景図鑑条目：(显示名, 英文/日文副标, 取图键)
+    BACKGROUND_GALLERY = (
+        ("紅魔館　外観", "SCARLET DEVIL MANSION", "scene"),
+        ("紅霧の麓", "STAGE 1  /  FOOTHILLS IN SCARLET MIST", "stage1"),
+        ("霧の湖", "STAGE 2  /  MISTY LAKE", "stage2"),
+        ("紅魔館　館内", "STAGE 3  /  SCARLET DEVIL MANSION", "stage3"),
+        ("異変解決", "ENDING  /  INCIDENT RESOLVED", "victory"),
+        ("霊力尽きる", "ENDING  /  INCIDENT UNRESOLVED", "defeat"),
+        ("異変のあと", "ENDING  /  AFTER THE INCIDENT", "afterword"),
+        ("戦績", "SCORE  /  RESULT", "result"),
+        ("標題", "TITLE", "title"),
+        ("音楽室", "MUSIC ROOM", "music"),
+        ("原作原画 01", "ENDING ILLUSTRATION 01", "roll1"),
+        ("原作原画 02", "ENDING ILLUSTRATION 02", "roll2"),
+        ("原作原画 03", "ENDING ILLUSTRATION 03", "roll3"),
+        ("原作原画 04", "ENDING ILLUSTRATION 04", "roll4"),
+        ("原作原画 05", "ENDING ILLUSTRATION 05", "roll5"),
+        ("原作原画 06", "ENDING ILLUSTRATION 06", "roll6"),
+    )
+    BACKGROUND_PREVIEW_SIZE = (720, 460)
     STAGE_TITLES = ("紅霧の麓", "霧の湖", "紅魔館")
     STAGE_SUBTITLES = (
         "Scarlet Mist  /  Stage 1",
@@ -467,6 +504,11 @@ class Game:
             (config.SCREEN_W, config.SCREEN_H), pygame.SRCALPHA
         )
         self.ending_shade.fill((7, 3, 9, 168))
+        # 后记文字页用更轻的压暗层：卡片半透明，让原作插图透出来
+        self.ending_light_shade = pygame.Surface(
+            (config.SCREEN_W, config.SCREEN_H), pygame.SRCALPHA
+        )
+        self.ending_light_shade.fill((7, 3, 9, 86))
 
         # 音楽室背景：TH06 原作 TL_DAT/music.jpg，右上角标题区域留白较多，
         # 正好用来铺曲目列表与 ZUN 评论。
@@ -479,6 +521,23 @@ class Game:
         )
         self.music_room_shade.fill((7, 3, 9, 96))   # 轻压暗，保留原作背景细节
 
+        # 謝辞滚动用的原作结局插画（ED_DAT），与名单一起自下而上轮播
+        gameplay_dir = asset_dir.parent / "gameplay"
+        self.credits_roll_images = tuple(
+            pygame.transform.smoothscale(
+                pygame.image.load(str(gameplay_dir / f"ending-roll-{index}.jpg")),
+                (config.SCREEN_W, config.SCREEN_H),
+            )
+            for index in range(1, 7)
+        )
+        # 背景図鑑：进入时一次性裁好预览图，避免每帧缩放
+        self.background_gallery = tuple(
+            (name, english,
+             _cover_scale(self._background_surface(key),
+                          self.BACKGROUND_PREVIEW_SIZE))
+            for name, english, key in self.BACKGROUND_GALLERY
+        )
+
         self.running = True
         self.scene = self.SCENE_TITLE
         self.menu_selection = 0
@@ -489,10 +548,15 @@ class Game:
         self.cg_gallery_index = 0        # 角色图鉴当前选中角色（0 起）
         self.cg_detail_active = False    # 是否进入角色详情页（查看多张 CG）
         self.cg_detail_cg_index = 0      # 详情页中当前查看的 CG 索引
-        self.cg_tab = 0                  # 人物録内页籤：0=人物図鑑，1=音楽室
+        self.cg_tab = 0                  # 人物録内页籤：0=人物図鑑，1=背景図鑑，2=音楽室
+        self.cg_background_index = 0     # 背景図鑑当前查看的画面（0 起）
         self.music_room_index = 0        # 音楽室当前选中的曲目（0 起）
         self.music_room_scroll = 0       # 曲目列表滚动偏移（首行序号）
         self.music_preview = None        # 正在试听的曲目文件名，None 表示未试听
+        self.credits_time = 0.0          # 謝辞滚动已播放的秒数
+        self._credits_active = False     # 上一帧是否停在謝辞页（用于重置滚动）
+        self.quit_confirm_active = False  # 标题菜单是否弹出「退出游戏」确认框
+        self.quit_confirm_index = 1       # 确认框选项：0=是，1=否（默认停在否）
         progress = _load_progress()
         self.unlocked_stage = progress["unlocked"]
         self.all_cleared = progress["all_cleared"]
@@ -595,6 +659,60 @@ class Game:
         """根据通关状态返回标题菜单项（通关后追加「日后谈」）。"""
         return self.MENU_ITEMS_CLEARED if self.all_cleared else self.MENU_ITEMS
 
+    def _handle_quit_confirm_key(self, key: int) -> None:
+        """退出确认框：左右切换「是 / 否」，Enter 确定，Esc 取消。"""
+        if key in (pygame.K_LEFT, pygame.K_a, pygame.K_RIGHT, pygame.K_d,
+                   pygame.K_UP, pygame.K_w, pygame.K_DOWN, pygame.K_s):
+            self.quit_confirm_index = 1 - self.quit_confirm_index
+            self.audio.play("menu_move")
+        elif key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            if self.quit_confirm_index == 0:
+                self.running = False
+            else:
+                self.quit_confirm_active = False
+                self.audio.play("menu_cancel")
+        elif key == pygame.K_ESCAPE:
+            self.quit_confirm_active = False
+            self.audio.play("menu_cancel")
+
+    def _handle_background_gallery_key(self, key: int) -> None:
+        """背景図鑑：方向键翻阅原作背景与结局插画。"""
+        total = len(self.background_gallery)
+        if key in (pygame.K_LEFT, pygame.K_a, pygame.K_UP, pygame.K_w):
+            if self.cg_background_index > 0:
+                self.cg_background_index -= 1
+                self.audio.play("menu_move")
+        elif key in (pygame.K_RIGHT, pygame.K_d, pygame.K_DOWN, pygame.K_s):
+            if self.cg_background_index < total - 1:
+                self.cg_background_index += 1
+                self.audio.play("menu_move")
+        elif key == pygame.K_ESCAPE:
+            self.audio.play("menu_cancel")
+            self.scene = self.SCENE_TITLE
+
+    def _on_credits_page(self) -> bool:
+        """当前是否停在謝辞滚动页（日后谈与通关流程的最后页）。"""
+        browsing = self.scene == self.SCENE_AFTERWORD
+        clearing = self.scene == self.SCENE_PLAYING and self.victory
+        if not (browsing or clearing):
+            return False
+        return getattr(self, "ending_page", 0) >= len(self.ENDING_PAGES) - 1
+
+    def _advance_credits_roll(self, dt: float) -> None:
+        """在謝辞页累加滚动计时；翻到该页时从头开始，滚完停在末页等 Enter。"""
+        on_credits = self._on_credits_page()
+        if on_credits and not getattr(self, "_credits_active", False):
+            self.credits_time = 0.0     # 刚翻到謝辞页：名单从页首重新滚
+        self._credits_active = on_credits
+        if on_credits:
+            self.credits_time = min(
+                self.CREDITS_SCROLL_SECONDS, self.credits_time + dt
+            )
+
+    def _credits_roll_finished(self) -> bool:
+        """謝辞名单是否已滚完（滚完前 Enter 不生效，避免漏看名单）。"""
+        return getattr(self, "credits_time", 0.0) >= self.CREDITS_SCROLL_SECONDS
+
     def _clamp_music_scroll(self) -> None:
         """让滚动窗口跟随当前选中曲目，保证它始终落在可视范围内。"""
         total = len(self.MUSIC_ROOM_TRACKS)
@@ -634,6 +752,9 @@ class Game:
 
     def _handle_keydown(self, key: int) -> None:
         if self.scene == self.SCENE_TITLE:
+            if getattr(self, "quit_confirm_active", False):
+                self._handle_quit_confirm_key(key)
+                return
             items = self._menu_items()
             if key == pygame.K_UP:
                 self.menu_selection = (self.menu_selection - 1) % len(items)
@@ -642,8 +763,14 @@ class Game:
                 self.menu_selection = (self.menu_selection + 1) % len(items)
                 self.audio.play("menu_move")
             elif key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                self.audio.play("menu_ok")
                 label = items[self.menu_selection]
+                if label == "退出游戏":
+                    # 先弹确认框，避免误触直接关闭
+                    self.quit_confirm_active = True
+                    self.quit_confirm_index = 1     # 默认停在「否」
+                    self.audio.play("menu_move")
+                    return
+                self.audio.play("menu_ok")
                 if label == "开始游戏":
                     self.stage_select_index = 0
                     self.scene = self.SCENE_STAGE_SELECT
@@ -658,13 +785,14 @@ class Game:
                     self.cg_gallery_index = 0
                     self.cg_detail_active = False
                     self.cg_tab = 0
+                    self.cg_background_index = 0
                     self.music_preview = None
                     self.scene = self.SCENE_CG_GALLERY
-                else:
-                    self.running = False
             elif key == pygame.K_ESCAPE:
-                self.audio.play("menu_cancel")
-                self.running = False
+                # Esc 与「退出游戏」同义：同样先确认
+                self.quit_confirm_active = True
+                self.quit_confirm_index = 1
+                self.audio.play("menu_move")
             return
 
         if self.scene == self.SCENE_STAGE_SELECT:
@@ -704,10 +832,11 @@ class Game:
                 if self.ending_page < len(self.ENDING_PAGES) - 1:
                     self.ending_page += 1
                     self.audio.play("menu_ok")
-                else:
+                elif self._credits_roll_finished():
                     self.audio.play("menu_cancel")
                     self.afterword_only = False
                     self.scene = self.SCENE_TITLE
+                # 名单还在滚：Enter 不生效，等滚完再退出
             elif key == pygame.K_ESCAPE:
                 self.audio.play("menu_cancel")
                 self.afterword_only = False
@@ -728,13 +857,16 @@ class Game:
 
         if self.scene == self.SCENE_CG_GALLERY:
             if key == pygame.K_TAB:
-                # 人物図鑑 ↔ 音楽室 页籤切换；离开音楽室时停止试听
-                self.cg_tab = 1 - self.cg_tab
+                # 人物図鑑 → 背景図鑑 → 音楽室 轮转；离开音楽室时停止试听
+                self.cg_tab = (self.cg_tab + 1) % len(self.GALLERY_TABS)
                 self.music_preview = None
                 self.audio.play("menu_move")
                 return
-            if self.cg_tab == 1:
+            if self.cg_tab == 2:
                 self._handle_music_room_key(key)
+                return
+            if self.cg_tab == 1:
+                self._handle_background_gallery_key(key)
                 return
             total = len(self.CG_GALLERY_ENTRIES)
             if self.cg_detail_active:
@@ -798,11 +930,12 @@ class Game:
                 if self.ending_page < len(self.ENDING_PAGES) - 1:
                     self.ending_page += 1
                     self.audio.play("menu_ok")
-                else:
+                elif self._credits_roll_finished():
                     self.audio.play("menu_cancel")
                     self.victory = False
                     self.scene = self.SCENE_TITLE
                     self.menu_selection = 0
+                # 名单还在滚：Enter 不生效，等滚完再退出
             elif key == pygame.K_ESCAPE:
                 self.audio.play("menu_cancel")
                 self.victory = False
@@ -1481,6 +1614,7 @@ class Game:
 
     def update(self, dt: float) -> None:
         self._update_music()
+        self._advance_credits_roll(dt)
         if self.scene != self.SCENE_PLAYING:
             return
         if self.paused or getattr(self, "cheat_prompt_active", False):
@@ -1705,10 +1839,10 @@ class Game:
             group = self.art.boss_faces
         return group[min(boss.phase, len(group)) - 1]
 
-    def _draw_ornate_panel(self, rect: pygame.Rect) -> None:
+    def _draw_ornate_panel(self, rect: pygame.Rect, alpha: int = 236) -> None:
         """绘制半透明双线描金卡片，底图始终保留原作素材。"""
         panel = pygame.Surface(rect.size, pygame.SRCALPHA)
-        panel.fill((10, 5, 12, 236))
+        panel.fill((10, 5, 12, alpha))
         self.screen.blit(panel, rect.topleft)
         pygame.draw.rect(self.screen, config.GOLD, rect, 2)
         pygame.draw.rect(self.screen, (120, 68, 54), rect.inflate(-14, -14), 1)
@@ -1876,12 +2010,21 @@ class Game:
 
     def _draw_ending(self, background: pygame.Surface, victory: bool) -> None:
         """結算回顾：原作插图、关卡进度、战绩与再战指引。"""
+        if victory and self.ending_page >= len(self.ENDING_PAGES) - 1:
+            # 謝辞页是滚动制作名单，自带原作插画背景，不再套金边卡片
+            self._draw_credits_roll()
+            return
+
+        text_page = victory and self.ending_page > 0
         self.screen.blit(background, (0, 0))
-        self.screen.blit(self.ending_shade, (0, 0))
+        # 后记文字页只轻压暗，让原作插图留在画面里
+        self.screen.blit(
+            self.ending_light_shade if text_page else self.ending_shade, (0, 0)
+        )
         panel = pygame.Rect(120, 128, 1040, 704)
-        self._draw_ornate_panel(panel)
+        self._draw_ornate_panel(panel, alpha=136 if text_page else 236)
         left = panel.left + 58
-        if victory and self.ending_page > 0:
+        if text_page:
             self._draw_victory_text_page(panel)
             return
 
@@ -1964,27 +2107,21 @@ class Game:
         )
 
     def _draw_victory_text_page(self, panel: pygame.Rect) -> None:
-        """原作式後記與鳴謝頁：沿用金邊卡片，襯以對應結局原圖。"""
+        """原作式後記页：半透明金边卡片上排字，襯以對應的結局原圖。"""
         page = self.ending_page
         left = panel.left + 58
         right = panel.right - 58
         afterword_count = len(self.VICTORY_AFTERWORD_PAGES)
-        is_afterword = 1 <= page <= afterword_count
-        is_credits = page == len(self.ENDING_PAGES) - 1
-
-        if is_afterword:
-            title = "後記"
-            subtitle = f"AFTERWORD  /  異変のあと  {page} / {afterword_count}"
-        else:
-            title = "謝辞"
-            subtitle = "STAFF ROLL  /  ACKNOWLEDGMENTS"
 
         self.screen.blit(
-            self.font_big.render(title, True, config.PALE_GOLD),
+            self.font_big.render("後記", True, config.PALE_GOLD),
             (left, panel.top + 42),
         )
         self.screen.blit(
-            self.font.render(subtitle, True, config.MUTED),
+            self.font.render(
+                f"AFTERWORD  /  異変のあと  {page} / {afterword_count}",
+                True, config.MUTED,
+            ),
             (left, panel.top + 108),
         )
         page_label = self.font.render(
@@ -1996,64 +2133,42 @@ class Game:
             (left, panel.top + 158), (right, panel.top + 158), 1,
         )
 
-        if is_afterword:
-            # 每页日后谈配一张角色立绘，营造原作 CG 感（右侧底部对齐）。
-            afterword_index = page - 1
-            if 0 <= afterword_index < len(self.AFTERWORD_PAGE_VISUALS):
-                _, portrait_key, portrait_idx = self.AFTERWORD_PAGE_VISUALS[
-                    afterword_index
-                ]
-                portraits = self.art.portraits.get(portrait_key)
-                if portraits and 0 <= portrait_idx < len(portraits):
-                    portrait = portraits[portrait_idx]
-                    px = panel.right - 40 - portrait.get_width()
-                    py = panel.bottom - 120 - portrait.get_height()
-                    # 立绘下方加一层柔光，让角色从深色卡片中浮起。
-                    glow = pygame.Surface(
-                        (portrait.get_width() + 40, portrait.get_height() + 40),
-                        pygame.SRCALPHA,
-                    )
-                    pygame.draw.ellipse(
-                        glow, (120, 68, 54, 55), glow.get_rect().inflate(-6, -6)
-                    )
-                    self.screen.blit(
-                        glow, (px - 20, py - 20),
-                    )
-                    self.screen.blit(portrait, (px, py))
+        # 每页日后谈配一张角色立绘，营造原作 CG 感（右侧底部对齐）。
+        afterword_index = page - 1
+        if 0 <= afterword_index < len(self.AFTERWORD_PAGE_VISUALS):
+            _, portrait_key, portrait_idx = self.AFTERWORD_PAGE_VISUALS[
+                afterword_index
+            ]
+            portraits = self.art.portraits.get(portrait_key)
+            if portraits and 0 <= portrait_idx < len(portraits):
+                portrait = portraits[portrait_idx]
+                px = panel.right - 40 - portrait.get_width()
+                py = panel.bottom - 120 - portrait.get_height()
+                # 立绘下方加一层柔光，让角色从卡片中浮起。
+                glow = pygame.Surface(
+                    (portrait.get_width() + 40, portrait.get_height() + 40),
+                    pygame.SRCALPHA,
+                )
+                pygame.draw.ellipse(
+                    glow, (120, 68, 54, 55), glow.get_rect().inflate(-6, -6)
+                )
+                self.screen.blit(glow, (px - 20, py - 20))
+                self.screen.blit(portrait, (px, py))
 
-            y = panel.top + 194
-            for line in self.VICTORY_AFTERWORD_PAGES[page - 1]:
-                if line:
-                    self.screen.blit(
-                        self.font.render(line, True, config.WHITE), (left, y)
-                    )
-                    y += 38
-                else:
-                    y += 22
-            if page == 1:
-                hint = "← 戰績  ·  → / Enter 下一頁  ·  R 再戰  ·  Esc 標題"
-            elif page == afterword_count:
-                hint = "← 上一頁  ·  → / Enter 謝辞  ·  R 再戰  ·  Esc 標題"
+        y = panel.top + 194
+        for line in self.VICTORY_AFTERWORD_PAGES[page - 1]:
+            if line:
+                self.screen.blit(
+                    self.font.render(line, True, config.WHITE), (left, y)
+                )
+                y += 38
             else:
-                hint = "← 上一頁  ·  → / Enter 下一頁  ·  R 再戰  ·  Esc 標題"
+                y += 22
+
+        if page == afterword_count:
+            hint = "← 上一頁  ·  → / Enter 謝辞  ·  R 再戰  ·  Esc 標題"
         else:
-            y = panel.top + 198
-            for label, value in self.VICTORY_CREDITS:
-                self.screen.blit(
-                    self.font.render(label, True, config.PALE_GOLD), (left, y)
-                )
-                self.screen.blit(
-                    self.font.render(value, True, config.WHITE),
-                    (left + 190, y),
-                )
-                y += 48
-            for index, line in enumerate(self.VICTORY_THANKS):
-                self._draw_center_text(
-                    line, config.PALE_GOLD, font=self.font,
-                    y=panel.bottom - 190 + index * 42,
-                    center_x=panel.centerx,
-                )
-            hint = "← 後記  ·  Enter / Esc 返回標題  ·  R 再戰"
+            hint = "← 上一頁  ·  → / Enter 下一頁  ·  R 再戰  ·  Esc 標題"
 
         divider_y = panel.bottom - 116
         pygame.draw.line(
@@ -2064,6 +2179,88 @@ class Game:
             self.font.render(hint, True, config.WHITE),
             (left, panel.bottom - 80),
         )
+
+    # 謝辞滚动名单的行高：按行的种类决定疏密
+    CREDITS_BLOCK_HEIGHT = {
+        "big": 78, "small": 36, "gap": 34, "row": 52, "thanks": 60,
+    }
+
+    def _credits_roll_blocks(self) -> list[tuple[str, str]]:
+        """謝辞名单内容：页首 → 制作名单 → 致谢 → 尾声，自上而下排列。"""
+        blocks: list[tuple[str, str]] = [
+            ("big", "謝辞"),
+            ("small", "STAFF ROLL  /  ACKNOWLEDGMENTS"),
+            ("gap", ""),
+        ]
+        blocks += [("row", f"{label}　　{value}")
+                   for label, value in self.VICTORY_CREDITS]
+        blocks.append(("gap", ""))
+        blocks += [("thanks", line) for line in self.VICTORY_THANKS]
+        blocks += [
+            ("gap", ""),
+            ("small", "東方紅霧録  /  SCARLET MIST RECORD"),
+            ("gap", ""),
+            ("thanks", "おわり"),
+        ]
+        return blocks
+
+    def _draw_credits_roll(self) -> None:
+        """謝辞页：原作结局插画轮播 + 自下而上滚动的制作名单。
+
+        滚动耗时固定为 :attr:`CREDITS_SCROLL_SECONDS`；滚完后停在末页继续
+        放着谢辞曲，等玩家按 Enter 才回标题。
+        """
+        images = self.credits_roll_images
+        elapsed = min(getattr(self, "credits_time", 0.0),
+                      self.CREDITS_SCROLL_SECONDS)
+        if images:
+            span = self.CREDITS_SCROLL_SECONDS / len(images)
+            position = elapsed / span
+            index = int(position) % len(images)
+            frac = position - int(position)
+            if frac < 0.45 and index != 0:
+                # 换图时用前一张垫底、新图淡入，避免硬切
+                self.screen.blit(images[index - 1], (0, 0))
+                images[index].set_alpha(int(255 * (frac / 0.45)))
+                self.screen.blit(images[index], (0, 0))
+                images[index].set_alpha(255)
+            else:
+                self.screen.blit(images[index], (0, 0))
+        veil = pygame.Surface((config.SCREEN_W, config.SCREEN_H), pygame.SRCALPHA)
+        veil.fill((6, 3, 8, 172))
+        self.screen.blit(veil, (0, 0))
+
+        blocks = self._credits_roll_blocks()
+        heights = [self.CREDITS_BLOCK_HEIGHT[kind] for kind, _ in blocks]
+        total = sum(heights)
+        start_y = config.SCREEN_H + 40
+        end_y = config.SCREEN_H - 150 - total
+        progress = min(1.0, elapsed / self.CREDITS_SCROLL_SECONDS)
+        y = start_y + (end_y - start_y) * progress
+
+        center_x = config.SCREEN_W // 2
+        for (kind, text), height in zip(blocks, heights):
+            if kind != "gap" and -60 <= y <= config.SCREEN_H + 60:
+                self._draw_center_text(
+                    text, config.WHITE if kind == "thanks" else config.PALE_GOLD,
+                    font=self.font_big if kind == "big" else self.font,
+                    y=y + height // 2, center_x=center_x,
+                )
+            y += height
+
+        # 底部进度条：让玩家看得出名单还要滚多久
+        track = pygame.Rect(0, config.SCREEN_H - 26, 560, 4)
+        track.centerx = center_x
+        pygame.draw.rect(self.screen, (60, 40, 40), track)
+        pygame.draw.rect(
+            self.screen, config.GOLD,
+            pygame.Rect(track.x, track.y, int(track.width * progress), track.height),
+        )
+        if progress >= 1.0:
+            self._draw_center_text(
+                "Enter 返回標題", config.PALE_GOLD, font=self.font,
+                y=config.SCREEN_H - 62, center_x=center_x,
+            )
 
     def _draw_pause_card(self) -> None:
         """暂停过场：保留战场和 HUD，展示正在展开的符卡。"""
@@ -2191,13 +2388,37 @@ class Game:
         ending_background = self._ending_background_for_page(self.ending_page)
         self._draw_ending(ending_background, victory=True)
 
+    def _background_surface(self, key: str) -> pygame.Surface:
+        """把背景図鑑的取图键映射到已加载的整屏画面。"""
+        stages = self.art.stage_backgrounds
+        if key.startswith("stage") and key[5:].isdigit():
+            index = min(int(key[5:]) - 1, len(stages) - 1)
+            return stages[index]
+        if key.startswith("roll") and key[4:].isdigit():
+            index = min(int(key[4:]) - 1, len(self.credits_roll_images) - 1)
+            return self.credits_roll_images[index]
+        fixed = {
+            "scene": self.art.scene_background,
+            "victory": self.art.ending_victory,
+            "defeat": self.art.ending_defeat,
+            "afterword": self.art.ending_afterword,
+            "result": self.art.result_screen,
+            "title": self.title_background,
+            "music": self.music_room_background,
+        }
+        return fixed.get(key, self.art.scene_background)
+
     def _draw_cg_gallery(self) -> None:
-        """紅霧人物録：人物図鑑与音楽室两个页籤共用一个全屏面板。"""
+        """紅霧人物録：人物図鑑 / 背景図鑑 / 音楽室三个页籤共用一个全屏面板。"""
         panel = pygame.Rect(60, 60, config.SCREEN_W - 120, config.SCREEN_H - 120)
-        if self.cg_tab == 1:
+        if self.cg_tab == 2:
             self.screen.blit(self.music_room_background, (0, 0))
             self.screen.blit(self.music_room_shade, (0, 0))
             self._draw_music_room(panel)
+        elif self.cg_tab == 1:
+            self.screen.blit(self.title_background, (0, 0))
+            self.screen.blit(self.entry_shade, (0, 0))
+            self._draw_background_gallery(panel)
         else:
             self.screen.blit(self.title_background, (0, 0))
             self.screen.blit(self.ending_shade, (0, 0))
@@ -2206,8 +2427,8 @@ class Game:
         self._draw_gallery_tabs(panel)
 
     def _draw_gallery_tabs(self, panel: pygame.Rect) -> None:
-        """顶部页籤：人物図鑑 / 音楽室（Tab 切换）。"""
-        labels = ("人物図鑑", "音楽室")
+        """顶部页籤：人物図鑑 / 背景図鑑 / 音楽室（Tab 轮转）。"""
+        labels = self.GALLERY_TABS
         tab_w, tab_h, gap = 170, 40, 10
         total_w = len(labels) * tab_w + (len(labels) - 1) * gap
         start_x = panel.centerx + 40 - total_w // 2
@@ -2224,6 +2445,58 @@ class Game:
                 label, True, config.PALE_GOLD if active else config.MUTED
             )
             self.screen.blit(text, text.get_rect(center=tab.center))
+
+    def _draw_background_gallery(self, panel: pygame.Rect) -> None:
+        """背景図鑑：翻阅原作关卡背景、结局插画与标题画面。"""
+        self._draw_ornate_panel(panel)
+        left = panel.left + 40
+        right = panel.right - 40
+        name, english, preview = self.background_gallery[self.cg_background_index]
+
+        self.screen.blit(
+            self.font_big.render("紅霧背景録", True, config.PALE_GOLD),
+            (left, panel.top + 32),
+        )
+        self.screen.blit(
+            self.font.render("BACKGROUND GALLERY  /  原作背景集", True, config.MUTED),
+            (left, panel.top + 96),
+        )
+        counter = self.font.render(
+            f"{self.cg_background_index + 1} / {len(self.background_gallery)}",
+            True, config.PALE_GOLD,
+        )
+        self.screen.blit(counter, counter.get_rect(topright=(right, panel.top + 56)))
+        pygame.draw.line(
+            self.screen, config.GOLD,
+            (left, panel.top + 138), (right, panel.top + 138), 1,
+        )
+
+        frame = preview.get_rect(center=(panel.centerx, panel.top + 410))
+        pygame.draw.rect(self.screen, config.GOLD, frame.inflate(6, 6), 2)
+        self.screen.blit(preview, frame)
+        self.screen.blit(
+            self.font.render(name, True, config.PALE_GOLD),
+            (left, frame.bottom + 22),
+        )
+        self.screen.blit(
+            self.font.render(english, True, config.MUTED),
+            (left, frame.bottom + 56),
+        )
+
+        if self.cg_background_index > 0:
+            prev_name = self.background_gallery[self.cg_background_index - 1][0]
+            prev = self.font_small.render(f"← {prev_name}", True, config.MUTED)
+            self.screen.blit(prev, (left, panel.bottom - 96))
+        if self.cg_background_index < len(self.background_gallery) - 1:
+            next_name = self.background_gallery[self.cg_background_index + 1][0]
+            nxt = self.font_small.render(f"{next_name} →", True, config.MUTED)
+            self.screen.blit(nxt, nxt.get_rect(topright=(right, panel.bottom - 96)))
+
+        hint = "← →  切換背景     Tab 切換頁籤     Esc 返回標題"
+        self.screen.blit(
+            self.font.render(hint, True, config.WHITE),
+            (left, panel.bottom - 36),
+        )
 
     def _draw_character_record(self, panel: pygame.Rect) -> None:
         """人物図鑑：列表态浏览角色，详情态查看该角色的多张 CG。"""
@@ -2393,7 +2666,7 @@ class Game:
                     name_label,
                     name_label.get_rect(midtop=(tframe.centerx, tframe.bottom + 6)),
                 )
-            hint = "← →  切換角色     Enter 查看 CG     Tab 音楽室     Esc 返回標題"
+            hint = "← →  切換角色     Enter 查看 CG     Tab 切換頁籤     Esc 返回標題"
 
         self.screen.blit(
             self.font.render(hint, True, config.WHITE),
@@ -2522,7 +2795,7 @@ class Game:
                 )
                 y += 36
 
-        hint = "↑ ↓  選擇曲目     Enter 試聽     Tab 人物図鑑     Esc 返回標題"
+        hint = "↑ ↓  選擇曲目     Enter 試聽     Tab 切換頁籤     Esc 返回標題"
         self.screen.blit(
             self.font.render(hint, True, config.WHITE),
             (left, panel.bottom - 36),

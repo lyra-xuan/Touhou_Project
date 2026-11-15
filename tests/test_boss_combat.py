@@ -65,6 +65,14 @@ def make_game() -> Game:
     game.all_cleared = False
     game.stage_select_index = 0
     game.afterword_only = False
+    game.credits_time = 0.0
+    game._credits_active = False
+    game.quit_confirm_active = False
+    game.quit_confirm_index = 1
+    game.cg_tab = 0
+    game.cg_background_index = 0
+    game.background_gallery = ()
+    game.credits_roll_images = ()
     # 计分与特效：贴图用占位小方块，避免测试里加载整套素材
     stub = pygame.Surface((8, 8), pygame.SRCALPHA)
     game.art = SimpleNamespace(  # type: ignore[assignment]
@@ -278,16 +286,35 @@ class StageFlowTests(unittest.TestCase):
         self.assertEqual(game.player.pos, player_position)
         self.assertEqual(game.bullets, [])
 
-    def test_title_exit_item_and_escape_close_the_game(self) -> None:
+    def test_title_exit_item_asks_for_confirmation_first(self) -> None:
         game = make_game()
         game.scene = Game.SCENE_TITLE
         # 「退出游戏」位于菜单索引 3：从索引 0 向下三次到达
         dispatch_keys(game, pygame.K_DOWN, pygame.K_DOWN, pygame.K_DOWN, pygame.K_RETURN)
+        # 只弹出确认框（默认停在「否」），不会直接关闭
+        self.assertTrue(game.quit_confirm_active)
+        self.assertTrue(game.running)
+
+        # 默认「否」：Enter 取消确认框，游戏继续
+        dispatch_keys(game, pygame.K_RETURN)
+        self.assertFalse(game.quit_confirm_active)
+        self.assertTrue(game.running)
+
+        # 重新弹出确认框并切到「是」，再 Enter 才真正退出
+        dispatch_keys(game, pygame.K_RETURN)
+        dispatch_keys(game, pygame.K_LEFT)
+        dispatch_keys(game, pygame.K_RETURN)
         self.assertFalse(game.running)
 
+    def test_title_escape_opens_quit_confirmation(self) -> None:
         game = make_game()
         game.scene = Game.SCENE_TITLE
         dispatch_keys(game, pygame.K_ESCAPE)
+        self.assertTrue(game.quit_confirm_active)
+        self.assertTrue(game.running)
+
+        dispatch_keys(game, pygame.K_LEFT)      # 切到「是」
+        dispatch_keys(game, pygame.K_RETURN)
         self.assertFalse(game.running)
 
     def test_gameplay_does_not_advance_while_on_title(self) -> None:
@@ -781,11 +808,19 @@ class GameOverAndEndingTests(unittest.TestCase):
         dispatch_keys(game, pygame.K_RETURN)
         self.assertEqual(game.ending_page, 2)
 
-        # 翻完所有后记页与谢辞页后，再按 Enter 回到标题
+        # 翻完所有后记页后进入谢辞滚动页
         dispatch_keys(game, pygame.K_RETURN)
         self.assertEqual(game.ending_page, 3)
         dispatch_keys(game, pygame.K_RETURN)
         self.assertEqual(game.ending_page, 4)
+
+        # 谢辞页名单还在滚动：Enter 不生效，停在原地继续播谢辞曲
+        dispatch_keys(game, pygame.K_RETURN)
+        self.assertEqual(game.scene, Game.SCENE_PLAYING)
+        self.assertTrue(game.victory)
+
+        # 名单滚完后，按 Enter 才回标题
+        game.credits_time = game.CREDITS_SCROLL_SECONDS
         dispatch_keys(game, pygame.K_RETURN)
         self.assertEqual(game.scene, Game.SCENE_TITLE)
         self.assertFalse(game.victory)
