@@ -149,6 +149,14 @@ class Game:
     TITLE_INFO_PANEL_RECT = (52, 52, 500, 360)
     MENU_ITEMS = ("开始游戏", "紅霧人物録", "操作说明", "退出游戏")
     MENU_ITEMS_CLEARED = ("开始游戏", "紅霧人物録", "操作说明", "退出游戏", "日后谈")
+    # 标题菜单副标题：仿 TH06 原作在日文标题下附英文小字
+    MENU_LABELS = {
+        "开始游戏": "GAME START",
+        "紅霧人物録": "CHARACTER RECORD",
+        "操作说明": "MANUAL",
+        "退出游戏": "QUIT",
+        "日后谈": "AFTERWORD",
+    }
     # 说明书分三页：背景 → 用语 → 操作
     MANUAL_PAGES = ("背景说明", "用语解说", "操作指南")
 
@@ -197,7 +205,8 @@ class Game:
         ("X", "灵击（Bomb）：消去身边弹幕，短时无敌"),
         ("F1", "暂停 / 继续"),
         ("F2", "开关碰撞调试层（判定圆、扫掠线、空间网格）"),
-        ("F3", "作弊模式：输入密码后解锁无敌（再次输入关闭）"),
+        ("F3", "作弊：输入密码后解锁无敌（再次输入关闭）"),
+        ("Tab", "人物录内切换「人物図鑑 / 音楽室」"),
         ("R", "胜负结算后重新开始"),
         ("胜利后 ← / →", "翻阅战绩、后记与鸣谢"),
         ("Enter", "推进对话；胜利后翻页/结束阅读；失败后返回标题"),
@@ -336,6 +345,97 @@ class Game:
         ),
     )
 
+    # 音楽室：TH06 原作全 17 曲，曲名与 ZUN 评论取自 MD_DAT/musiccmt.txt。
+    # 每条：(试听文件, 曲名, 英文名, 评论段落)
+    MUSIC_ROOM_TRACKS = (
+        ("th06_01.mid", "比赤色更紅的夢", "A Dream More Scarlet than Red", (
+            "標題画面的音樂。既然是東方，就試着做成了和風。",
+            "明明游戲本身都不像是和風的説；",
+            "不過，畢竟是標題画面所必需的曲子。",
+        )),
+        ("th06_02.mid", "如鬼灯般的紅色之魂", "A Soul as Red as a Ground Cherry", (
+            "第１面的音樂。想要突出夜晚森林的印象。",
+            "與其說給人勇氣感，",
+            "還不如說是有趣的百鬼夜行吧？",
+        )),
+        ("th06_03.mid", "妖魔夜行", "Apparitions Stalk the Night", (
+            "露米婭的音樂。表現夜晚的妖怪的印象。",
+            "不僅是這首音樂，總的來說這次的音樂都變得輕快了。",
+            "總的來說，是有些笨蛋的感覺。",
+        )),
+        ("th06_04.mid", "錯亂的妖精", "Lunate Elf", (
+            "第２面的音樂。",
+            "有水和霧的印象，試着混入了些可怕的感覺。",
+            "雖説是第２面，卻不清楚到底為什麼而存在。",
+        )),
+        ("th06_05.mid", "活潑的純情小姑娘", "Beloved Tomboyish Girl", (
+            "琪露諾的音樂。",
+            "果然，作成了有些笨的少女的印象。",
+            "以高速度的旋律爲主。算了，反正是第２面啦。",
+        )),
+        ("th06_06.mid", "上海紅茶館 ～ Chinese Tea", "Shanghai Teahouse ～ Chinese Tea", (
+            "第３面的音樂。雖然打算作成中華風，結果好像不是這樣。",
+            "不過音樂是東洋風；",
+            "與其說是 Fusion，不如說是 New Age 風吧？",
+        )),
+        ("th06_07.mid", "明治17年的上海愛麗絲", "Shanghai Alice of Meiji 17", (
+            "紅美鈴的音樂。",
+            "歐羅巴的香味和遊戲音樂的香味混合在一起。（2：8 左右）",
+            "以上海的法國租界為印象。",
+        )),
+        ("th06_08.mid", "巴瓦魯魔法圖書館", "Voile, the Magic Library", (
+            "第４面的音樂。從這關開始就是室內的場地。",
+            "後半，中 Boss 左右曲調開始變得有點可怕。",
+            "要說特徵的話——不像是ＳＴＧ的曲子（笑）",
+        )),
+        ("th06_09.mid", "封閉的少女 ～ 少女密室", "Locked Girl ～ The Girl's Secret Room", (
+            "帕秋莉·諾蕾姬的音樂。",
+            "有點陰暗的曲子。節奏激烈卻沒有明快的感覺。",
+            "聽了這首曲子就會感受到那微妙陰暗的氣息（笑）",
+        )),
+        ("th06_10.mid", "女僕和血的懷錶", "The Maid and the Pocket Watch of Blood", (
+            "第５面的音樂。不可思議的不可思議之曲。",
+            "本想讓曲子充滿速度感，結果卻給人一種搖搖欲墜的感覺，",
+            "是不是因為使用了特殊的節拍的緣故呢？",
+        )),
+        ("th06_11.mid", "月時計 ～ 月的鐘錶盤", "Lunar Clock ～ Luna Dial", (
+            "十六夜·咲夜的音樂。",
+            "說起女僕就是要重搖滾（假的）。",
+            "……果然是誤解了搖滾的定义吧（^^；",
+        )),
+        ("th06_12.mid", "TEPES的年輕末裔", "The Young Descendant of Tepes", (
+            "最終關的音樂。",
+            "最終關一向都是比較寧靜的，所以這次採用了輕快的風格。",
+            "只是短短的關卡裏用來連接的曲子。",
+        )),
+        ("th06_13.mid", "為死亡的公主所奏的七重奏", "Septette for the Dead Princess", (
+            "蕾米利亞·斯卡蕾特的音樂。這就是最後了！",
+            "因為不喜歡那樣厚重和令人不快的最終關，",
+            "融合了爵士乐風格和蘿莉的要素——就和平時一樣了。",
+        )),
+        ("th06_14.mid", "魔法少女們的百年祭典", "The Centennial Festival for Magical Girls", (
+            "ＥＸ關的音樂。有時是中華風，有時是 New Age 風格。",
+            "也沒去想什麼主題，就在鍵盤上这样彈出来了。",
+            "像是集我的惰性於大成的曲子。",
+        )),
+        ("th06_15.mid", "U.N.OWEN就是她嗎？", "U.N. Owen Was Her?", (
+            "芙蘭多露·斯卡蕾特的音樂。這次最喜歡的音樂。",
+            "挑戰是否能表現出神秘的結果。",
+            "用鍵盤演奏很有趣。",
+        )),
+        ("th06_16.mid", "比紅色更虛無的永遠", "A Dream More Transient than Scarlet", (
+            "結局的音樂。",
+            "從曲名就可以想像出，是像片頭一樣編曲的東西。",
+            "所以用了和風——或者說，和風的音樂都不错吧。",
+        )),
+        ("th06_17.mid", "紅樓 ～ Eastern Dream．．．", "Crimson Belvedere ～ Eastern Dream...", (
+            "製作人員表的音樂。",
+            "前作製作人員表的音樂一直都是絕望陰暗的調子，",
+            "但這次變成了充满希望而明快的曲子了……大概吧。",
+        )),
+    )
+    MUSIC_ROOM_VISIBLE = 12         # 音楽室列表一屏可显示的曲目数
+
     def __init__(self) -> None:
         pygame.init()
         self.screen = pygame.display.set_mode((config.SCREEN_W, config.SCREEN_H))
@@ -344,6 +444,8 @@ class Game:
         self.clock = pygame.time.Clock()
         self.font = _load_font(24)
         self.font_big = _load_font(42)
+        self.font_menu = _load_font(32)      # 标题菜单主文字（仿原作大字）
+        self.font_small = _load_font(18)     # 菜单英文副标与音楽室曲目列表
         self.art = GameArt()
         self.audio = Audio()
         asset_dir = Path(__file__).resolve().parent.parent / "assets" / "title"
@@ -366,27 +468,16 @@ class Game:
         )
         self.ending_shade.fill((7, 3, 9, 168))
 
-        menu_atlas = pygame.image.load(str(asset_dir / "project-striker-menu.webp"))
-        # 加载全部 6 行 atlas（每行 2 列：选中/未选中），按菜单项映射取用。
-        # atlas 行：0=Game Start, 1=Replay, 2=Player Data, 3=Manual, 4=Config, 5=Quit
-        self._menu_atlas_rows = tuple(
-            tuple(
-                pygame.transform.smoothscale(
-                    menu_atlas.subsurface((column * 256, row * 64, 256, 64)),
-                    (360, 90),
-                )
-                for column in (0, 1)
-            )
-            for row in range(6)
+        # 音楽室背景：TH06 原作 TL_DAT/music.jpg，右上角标题区域留白较多，
+        # 正好用来铺曲目列表与 ZUN 评论。
+        self.music_room_background = pygame.transform.smoothscale(
+            pygame.image.load(str(asset_dir / "music-room.jpg")),
+            (config.SCREEN_W, config.SCREEN_H),
         )
-        # 菜单项 → atlas 行映射
-        self.MENU_ATLAS_ROW = {
-            "开始游戏": 0,
-            "紅霧人物録": 2,
-            "操作说明": 3,
-            "退出游戏": 5,
-            "日后谈": 1,
-        }
+        self.music_room_shade = pygame.Surface(
+            (config.SCREEN_W, config.SCREEN_H), pygame.SRCALPHA
+        )
+        self.music_room_shade.fill((7, 3, 9, 96))   # 轻压暗，保留原作背景细节
 
         self.running = True
         self.scene = self.SCENE_TITLE
@@ -398,6 +489,10 @@ class Game:
         self.cg_gallery_index = 0        # 角色图鉴当前选中角色（0 起）
         self.cg_detail_active = False    # 是否进入角色详情页（查看多张 CG）
         self.cg_detail_cg_index = 0      # 详情页中当前查看的 CG 索引
+        self.cg_tab = 0                  # 人物録内页籤：0=人物図鑑，1=音楽室
+        self.music_room_index = 0        # 音楽室当前选中的曲目（0 起）
+        self.music_room_scroll = 0       # 曲目列表滚动偏移（首行序号）
+        self.music_preview = None        # 正在试听的曲目文件名，None 表示未试听
         progress = _load_progress()
         self.unlocked_stage = progress["unlocked"]
         self.all_cleared = progress["all_cleared"]
@@ -500,6 +595,43 @@ class Game:
         """根据通关状态返回标题菜单项（通关后追加「日后谈」）。"""
         return self.MENU_ITEMS_CLEARED if self.all_cleared else self.MENU_ITEMS
 
+    def _clamp_music_scroll(self) -> None:
+        """让滚动窗口跟随当前选中曲目，保证它始终落在可视范围内。"""
+        total = len(self.MUSIC_ROOM_TRACKS)
+        visible = self.MUSIC_ROOM_VISIBLE
+        if self.music_room_index < self.music_room_scroll:
+            self.music_room_scroll = self.music_room_index
+        elif self.music_room_index >= self.music_room_scroll + visible:
+            self.music_room_scroll = self.music_room_index - visible + 1
+        self.music_room_scroll = max(0, min(self.music_room_scroll,
+                                            max(0, total - visible)))
+
+    def _handle_music_room_key(self, key: int) -> None:
+        """音楽室：上下选曲、Enter 试听、Esc 返回标题（Tab 由外层处理）。"""
+        total = len(self.MUSIC_ROOM_TRACKS)
+        if key in (pygame.K_UP, pygame.K_w):
+            if self.music_room_index > 0:
+                self.music_room_index -= 1
+                self._clamp_music_scroll()
+                self.audio.play("menu_move")
+        elif key in (pygame.K_DOWN, pygame.K_s):
+            if self.music_room_index < total - 1:
+                self.music_room_index += 1
+                self._clamp_music_scroll()
+                self.audio.play("menu_move")
+        elif key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            filename = self.MUSIC_ROOM_TRACKS[self.music_room_index][0]
+            if self.audio.play_file(filename):
+                self.music_preview = filename
+                self.audio.play("menu_ok")
+            else:
+                self.audio.play("menu_cancel")
+        elif key == pygame.K_ESCAPE:
+            self.audio.play("menu_cancel")
+            self.music_preview = None
+            self.scene = self.SCENE_TITLE
+            self.menu_selection = 0
+
     def _handle_keydown(self, key: int) -> None:
         if self.scene == self.SCENE_TITLE:
             items = self._menu_items()
@@ -524,6 +656,9 @@ class Game:
                     self.scene = self.SCENE_AFTERWORD
                 elif label == "紅霧人物録":
                     self.cg_gallery_index = 0
+                    self.cg_detail_active = False
+                    self.cg_tab = 0
+                    self.music_preview = None
                     self.scene = self.SCENE_CG_GALLERY
                 else:
                     self.running = False
@@ -592,6 +727,15 @@ class Game:
             return
 
         if self.scene == self.SCENE_CG_GALLERY:
+            if key == pygame.K_TAB:
+                # 人物図鑑 ↔ 音楽室 页籤切换；离开音楽室时停止试听
+                self.cg_tab = 1 - self.cg_tab
+                self.music_preview = None
+                self.audio.play("menu_move")
+                return
+            if self.cg_tab == 1:
+                self._handle_music_room_key(key)
+                return
             total = len(self.CG_GALLERY_ENTRIES)
             if self.cg_detail_active:
                 # 详情页：← → 切换该角色的多张 CG，Esc 返回列表
@@ -666,6 +810,24 @@ class Game:
                 self.menu_selection = 0
             return
 
+        # 作弊密码输入中：优先处理，Esc 只关闭输入框，不会直接退出游戏
+        if getattr(self, "cheat_prompt_active", False):
+            if pygame.K_0 <= key <= pygame.K_9:
+                self.cheat_input += chr(key)
+                self.audio.play("menu_move")
+                if len(self.cheat_input) >= len(self.CHEAT_PASSWORD):
+                    if self.cheat_input == self.CHEAT_PASSWORD:
+                        self.god_mode = not self.god_mode
+                        self.audio.play("menu_ok")
+                    else:
+                        self.audio.play("menu_cancel")
+                    self.cheat_prompt_active = False
+                    self.cheat_input = ""
+            elif key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                self.cheat_prompt_active = False
+                self.cheat_input = ""
+                self.audio.play("menu_cancel")
+            return
         if key == pygame.K_ESCAPE:
             self.running = False
             return
@@ -694,23 +856,6 @@ class Game:
                 self.cheat_prompt_active = True
                 self.cheat_input = ""
                 self.audio.play("menu_ok")
-            return
-        # 作弊密码输入中：只接受数字键
-        if getattr(self, "cheat_prompt_active", False):
-            if pygame.K_0 <= key <= pygame.K_9:
-                self.cheat_input += chr(key)
-                self.audio.play("menu_move")
-                if len(self.cheat_input) >= len(self.CHEAT_PASSWORD):
-                    if self.cheat_input == self.CHEAT_PASSWORD:
-                        self.god_mode = not self.god_mode
-                        self.audio.play("menu_ok")
-                    else:
-                        self.audio.play("menu_cancel")
-                    self.cheat_prompt_active = False
-                    self.cheat_input = ""
-            elif key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
-                self.cheat_prompt_active = False
-                self.cheat_input = ""
             return
 
     def _read_player_input(self) -> tuple[bool, bool]:
@@ -1291,6 +1436,8 @@ class Game:
             self.audio.play_music("title")
             return
         if self.scene == self.SCENE_CG_GALLERY:
+            if getattr(self, "music_preview", None):
+                return          # 音楽室试听中：不覆盖试听曲目
             self.audio.play_music("ending")
             return
         if self.scene == self.SCENE_AFTERWORD:
@@ -2045,11 +2192,41 @@ class Game:
         self._draw_ending(ending_background, victory=True)
 
     def _draw_cg_gallery(self) -> None:
-        """紅霧人物録：列表态浏览角色，详情态查看该角色的多张 CG。"""
-        self.screen.blit(self.title_background, (0, 0))
-        self.screen.blit(self.ending_shade, (0, 0))
-
+        """紅霧人物録：人物図鑑与音楽室两个页籤共用一个全屏面板。"""
         panel = pygame.Rect(60, 60, config.SCREEN_W - 120, config.SCREEN_H - 120)
+        if self.cg_tab == 1:
+            self.screen.blit(self.music_room_background, (0, 0))
+            self.screen.blit(self.music_room_shade, (0, 0))
+            self._draw_music_room(panel)
+        else:
+            self.screen.blit(self.title_background, (0, 0))
+            self.screen.blit(self.ending_shade, (0, 0))
+            self._draw_character_record(panel)
+        # 页籤最后绘制，压在内容之上
+        self._draw_gallery_tabs(panel)
+
+    def _draw_gallery_tabs(self, panel: pygame.Rect) -> None:
+        """顶部页籤：人物図鑑 / 音楽室（Tab 切换）。"""
+        labels = ("人物図鑑", "音楽室")
+        tab_w, tab_h, gap = 170, 40, 10
+        total_w = len(labels) * tab_w + (len(labels) - 1) * gap
+        start_x = panel.centerx + 40 - total_w // 2
+        for index, label in enumerate(labels):
+            tab = pygame.Rect(
+                start_x + index * (tab_w + gap), panel.top + 30, tab_w, tab_h
+            )
+            active = index == self.cg_tab
+            pygame.draw.rect(
+                self.screen, (92, 20, 34) if active else (34, 14, 22), tab
+            )
+            pygame.draw.rect(self.screen, config.GOLD, tab, 1)
+            text = self.font.render(
+                label, True, config.PALE_GOLD if active else config.MUTED
+            )
+            self.screen.blit(text, text.get_rect(center=tab.center))
+
+    def _draw_character_record(self, panel: pygame.Rect) -> None:
+        """人物図鑑：列表态浏览角色，详情态查看该角色的多张 CG。"""
         self._draw_ornate_panel(panel)
         left = panel.left + 40
         right = panel.right - 40
@@ -2216,12 +2393,156 @@ class Game:
                     name_label,
                     name_label.get_rect(midtop=(tframe.centerx, tframe.bottom + 6)),
                 )
-            hint = "← →  切換角色     Enter 查看 CG     Esc 返回標題"
+            hint = "← →  切換角色     Enter 查看 CG     Tab 音楽室     Esc 返回標題"
 
         self.screen.blit(
             self.font.render(hint, True, config.WHITE),
             (left, panel.bottom - 36),
         )
+
+    def _draw_music_room(self, panel: pygame.Rect) -> None:
+        """音楽室：左列 TH06 原曲一览，右列所选曲目的 ZUN 评论，Enter 试听。"""
+        left = panel.left + 40
+        right = panel.right - 40
+
+        def card(rect: pygame.Rect) -> None:
+            """音楽室内的半透明卡片：让原作 music.jpg 背景透出来。"""
+            surface = pygame.Surface(rect.size, pygame.SRCALPHA)
+            surface.fill((10, 5, 12, 150))
+            self.screen.blit(surface, rect.topleft)
+            pygame.draw.rect(self.screen, config.GOLD, rect, 1)
+
+        self.screen.blit(
+            self.font_big.render("音楽室", True, config.PALE_GOLD),
+            (left, panel.top + 32),
+        )
+        self.screen.blit(
+            self.font.render(
+                "MUSIC ROOM  /  東方紅魔郷 全 17 曲", True, config.MUTED
+            ),
+            (left, panel.top + 96),
+        )
+        counter = self.font.render(
+            f"No.{self.music_room_index + 1:02d} / {len(self.MUSIC_ROOM_TRACKS)}",
+            True, config.PALE_GOLD,
+        )
+        self.screen.blit(counter, counter.get_rect(topright=(right, panel.top + 56)))
+        pygame.draw.line(
+            self.screen, config.GOLD,
+            (left, panel.top + 138), (right, panel.top + 138), 1,
+        )
+
+        row_h = 46
+        visible = self.MUSIC_ROOM_VISIBLE
+        list_rect = pygame.Rect(left, panel.top + 172, 600, visible * row_h + 12)
+        card(list_rect)
+        for row in range(visible):
+            index = self.music_room_scroll + row
+            if index >= len(self.MUSIC_ROOM_TRACKS):
+                break
+            filename, title, _, _ = self.MUSIC_ROOM_TRACKS[index]
+            row_rect = pygame.Rect(
+                list_rect.x + 8, list_rect.y + 6 + row * row_h,
+                list_rect.width - 16, row_h - 6,
+            )
+            active = index == self.music_room_index
+            if active:
+                pygame.draw.rect(self.screen, (92, 20, 34), row_rect)
+                pygame.draw.rect(self.screen, config.GOLD, row_rect, 1)
+                pygame.draw.polygon(self.screen, config.RED, (
+                    (row_rect.left + 8, row_rect.centery - 8),
+                    (row_rect.left + 8, row_rect.centery + 8),
+                    (row_rect.left + 22, row_rect.centery),
+                ))
+            number = self.font_small.render(
+                f"No.{index + 1:02d}", True, config.MUTED
+            )
+            self.screen.blit(
+                number, number.get_rect(midleft=(row_rect.left + 34, row_rect.centery))
+            )
+            title_surface = self.font.render(
+                title, True, config.WHITE if active else config.MUTED
+            )
+            self.screen.blit(
+                title_surface,
+                title_surface.get_rect(midleft=(row_rect.left + 112, row_rect.centery)),
+            )
+            if filename == self.music_preview:
+                mark = self.font_small.render("▶ 再生中", True, config.PALE_GOLD)
+                self.screen.blit(
+                    mark, mark.get_rect(midright=(row_rect.right - 10, row_rect.centery))
+                )
+
+        # 列表滚动条：曲目多于可视行数时给出位置提示
+        total = len(self.MUSIC_ROOM_TRACKS)
+        if total > visible:
+            bar = pygame.Rect(
+                list_rect.right - 8, list_rect.y + 10, 4, list_rect.height - 20
+            )
+            pygame.draw.rect(self.screen, (60, 40, 40), bar)
+            thumb_h = max(24, bar.height * visible // total)
+            thumb_y = bar.y + (bar.height - thumb_h) * self.music_room_scroll // (
+                total - visible
+            )
+            pygame.draw.rect(
+                self.screen, config.PALE_GOLD,
+                pygame.Rect(bar.x, thumb_y, bar.width, thumb_h),
+            )
+
+        # 右列：所选曲目的曲名、英文名与 ZUN 评论
+        detail_rect = pygame.Rect(
+            list_rect.right + 30, list_rect.y, right - (list_rect.right + 30),
+            list_rect.height,
+        )
+        card(detail_rect)
+        text_left = detail_rect.x + 26
+        text_width = detail_rect.width - 52
+        _, title, en_title, comment = self.MUSIC_ROOM_TRACKS[self.music_room_index]
+        y = detail_rect.y + 26
+        for line in self._wrap_text(title, self.font_big, text_width):
+            self.screen.blit(
+                self.font_big.render(line, True, config.PALE_GOLD), (text_left, y)
+            )
+            y += 52
+        y += 6
+        for line in self._wrap_text(en_title, self.font_small, text_width):
+            self.screen.blit(
+                self.font_small.render(line, True, config.MUTED), (text_left, y)
+            )
+            y += 26
+        y += 10
+        pygame.draw.line(
+            self.screen, (120, 68, 54), (text_left, y), (text_left + text_width, y), 1
+        )
+        y += 26
+        for paragraph in comment:
+            for line in self._wrap_text(paragraph, self.font, text_width):
+                self.screen.blit(
+                    self.font.render(line, True, config.WHITE), (text_left, y)
+                )
+                y += 36
+
+        hint = "↑ ↓  選擇曲目     Enter 試聽     Tab 人物図鑑     Esc 返回標題"
+        self.screen.blit(
+            self.font.render(hint, True, config.WHITE),
+            (left, panel.bottom - 36),
+        )
+
+    def _wrap_text(self, text: str, font: pygame.font.Font,
+                   max_width: int) -> list[str]:
+        """按像素宽度逐字折行，供音楽室的长曲名与 ZUN 评论换行使用。"""
+        lines: list[str] = []
+        current = ""
+        for char in text:
+            candidate = current + char
+            if current and font.size(candidate)[0] > max_width:
+                lines.append(current)
+                current = char
+            else:
+                current = candidate
+        if current:
+            lines.append(current)
+        return lines
 
 
     # 每页日后谈对应的背景与立绘：营造原作 CG 感，而非纯文本。
@@ -2299,31 +2620,48 @@ class Game:
         )
         self.screen.blit(
             self.font.render("↑ / ↓ 選擇    Enter 開始", True, config.WHITE),
-            (800, 425),
+            (800, 424),
         )
 
-        # 所有菜单项统一使用 atlas 图片风格。
+        # 菜单：仿 TH06 原作——大字标题 + 英文小字，选中项以红色光标与金框标示。
         items = self._menu_items()
         count = len(items)
-        btn_w, btn_h = 360, 90
-        # 根据菜单项数量自适应起始位置与间距，保证全部可见。
-        if count <= 4:
-            start_y, gap = 500, 14
-        else:
-            start_y, gap = 466, 8
+        row_h, gap = 58, 14
+        block_h = count * row_h + (count - 1) * gap
+        start_y = 660 - block_h // 2      # 菜单整体在右侧垂直居中
         for index, label in enumerate(items):
-            y = start_y + index * (btn_h + gap)
-            row = self.MENU_ATLAS_ROW.get(label, 0)
-            selected, idle = self._menu_atlas_rows[row]
-            image = selected if index == self.menu_selection else idle
-            # 选中项加一层绯红高光底板，增强厚重感
-            if index == self.menu_selection:
-                plate = pygame.Rect(794, y - 3, btn_w + 12, btn_h + 6)
-                hl = pygame.Surface(plate.size, pygame.SRCALPHA)
-                hl.fill((92, 20, 34, 130))
-                self.screen.blit(hl, plate.topleft)
-                pygame.draw.rect(self.screen, config.GOLD, plate, 2)
-            self.screen.blit(image, (800, y))
+            y = start_y + index * (row_h + gap)
+            row = pygame.Rect(786, y, 420, row_h)
+            selected = index == self.menu_selection
+            if selected:
+                plate = pygame.Surface(row.size, pygame.SRCALPHA)
+                plate.fill((92, 20, 34, 150))
+                self.screen.blit(plate, row.topleft)
+                pygame.draw.rect(self.screen, config.GOLD, row, 2)
+                pygame.draw.rect(
+                    self.screen, (120, 68, 54), row.inflate(-8, -8), 1
+                )
+                # 原作风格的红色三角光标
+                cursor = (
+                    (row.left - 26, row.centery - 11),
+                    (row.left - 26, row.centery + 11),
+                    (row.left - 4, row.centery),
+                )
+                pygame.draw.polygon(self.screen, config.RED, cursor)
+            chinese = self.font_menu.render(
+                label, True,
+                config.WHITE if selected else config.MUTED,
+            )
+            self.screen.blit(
+                chinese, chinese.get_rect(midleft=(row.left + 42, row.centery))
+            )
+            english = self.font_small.render(
+                self.MENU_LABELS[label], True,
+                config.PALE_GOLD if selected else (110, 92, 86),
+            )
+            self.screen.blit(
+                english, english.get_rect(midright=(row.right - 18, row.centery + 4))
+            )
 
     def _draw_manual_screen(self) -> None:
         """说明书：哥特风双线描金边框 + 页签，依次为背景、用语、操作。"""
@@ -2768,7 +3106,7 @@ class Game:
 
         hints = (
             "方向键 / WASD   移动",
-            "Shift 低速   F3 密码无敌",
+            "Shift 低速   F3 作弊",
             "Z 射击   X 灵击   F1 暂停",
         )
         for index, hint in enumerate(hints):

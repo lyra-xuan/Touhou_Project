@@ -120,6 +120,27 @@ class Audio:
                 return
         self.current_music = name
 
+    def play_file(self, filename: str, fade_ms: int = 300) -> bool:
+        """试听 ``assets/bgm`` 下的单曲，供音楽室使用。
+
+        与场景音乐共用同一条音乐通道，因此用 ``@文件名`` 作为 ``current_music``
+        标记，避免被 :meth:`play_music` 误判为「已在播放同一首」而跳过切换。
+        返回是否成功播放。
+        """
+        if not self.music_ready:
+            return False
+        path = _BGM_ROOT / filename
+        if not path.is_file():
+            return False
+        try:
+            pygame.mixer.music.load(str(path))
+            pygame.mixer.music.set_volume(_MUSIC_VOLUME)
+            pygame.mixer.music.play(-1, fade_ms=fade_ms)
+        except pygame.error:
+            return False
+        self.current_music = f"@{filename}"
+        return True
+
     def stop_music(self, fade_ms: int = 400) -> None:
         """淡出并停止背景音乐。"""
         if not self.music_ready or self.current_music is None:
