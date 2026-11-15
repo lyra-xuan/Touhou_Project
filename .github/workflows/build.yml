@@ -73,11 +73,22 @@ jobs:
         with:
           name: th06-scarlet-mist-${{ runner.os }}
           path: dist/${{ steps.vars.outputs.executableName }}
+      - name: Resolve release notes
+        id: notes
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          # 发版说明按版本号存放在 .github/release-notes/<tag>.md，存在则用作 Release 正文
+          notes=".github/release-notes/${GITHUB_REF_NAME}.md"
+          if [ ! -f "$notes" ]; then
+            notes=""
+          fi
+          echo "body_path=${notes}" >> $GITHUB_OUTPUT
       - name: Upload to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: dist/${{ steps.vars.outputs.executableName }}
+          body_path: ${{ steps.notes.outputs.body_path }}
           generate_release_notes: true
           draft: false
           name: 东方红雾录 ${{ github.ref_name }}

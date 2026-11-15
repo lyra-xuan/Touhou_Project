@@ -83,6 +83,18 @@ bash build.sh
 
 产物在 `dist/` 目录下。CI 配置见 [.github/workflows/build.yml](.github/workflows/build.yml)。
 
+## 🚀 发版流程
+
+1. 在 [.github/release-notes](.github/release-notes) 下按版本号新建说明文件（如 `v1.0.5.md`），写明本版的**新增功能**与**问题修复**。
+2. 打 tag 并推送：
+
+```bash
+git tag -a v1.0.5 -m "东方红雾录 v1.0.5"
+git push origin v1.0.5
+```
+
+3. CI 会在三平台构建，并把该说明文件作为 Release 正文发布；若未提供对应说明文件，则回退为自动生成的 changelog。
+
 ## 📁 项目结构
 
 ```text
@@ -102,6 +114,7 @@ src/
 assets/                 战斗素材、音效、背景音乐、标题图（含来源说明）
 tests/                  回归测试
 docs/                   需求、制作指南、素材清单
+.github/                CI 工作流与按版本号存放的发版说明
 ```
 
 ## 🧰 技术栈
