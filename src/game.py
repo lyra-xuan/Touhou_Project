@@ -2928,6 +2928,40 @@ class Game:
                 english, english.get_rect(midright=(row.right - 18, row.centery + 4))
             )
 
+        if getattr(self, "quit_confirm_active", False):
+            self._draw_quit_confirm()
+
+    def _draw_quit_confirm(self) -> None:
+        """标题页退出确认框：压暗整屏后居中弹出「是 / 否」。"""
+        veil = pygame.Surface((config.SCREEN_W, config.SCREEN_H), pygame.SRCALPHA)
+        veil.fill((4, 2, 6, 176))
+        self.screen.blit(veil, (0, 0))
+
+        panel = pygame.Rect(0, 0, 560, 232)
+        panel.center = (config.SCREEN_W // 2, config.SCREEN_H // 2)
+        self._draw_ornate_panel(panel)
+        center_x = panel.centerx
+        self._draw_center_text(
+            "退出游戏？", config.PALE_GOLD, font=self.font_big,
+            y=panel.top + 62, center_x=center_x,
+        )
+        self._draw_center_text(
+            "確定要離開東方紅霧録嗎？", config.WHITE, font=self.font,
+            y=panel.top + 112, center_x=center_x,
+        )
+        for index, label in enumerate(("是", "否")):
+            selected = index == self.quit_confirm_index
+            color = config.GOLD if selected else config.MUTED
+            self._draw_center_text(
+                f"『{label}』" if selected else f"　{label}　",
+                color, font=self.font_big, y=panel.top + 166,
+                center_x=center_x + (-96 if index == 0 else 96),
+            )
+        self._draw_center_text(
+            "← →  選擇    Enter 確定    Esc 取消", config.MUTED,
+            font=self.font, y=panel.bottom - 20, center_x=center_x,
+        )
+
     def _draw_manual_screen(self) -> None:
         """说明书：哥特风双线描金边框 + 页签，依次为背景、用语、操作。"""
         self.screen.blit(self.title_background, (0, 0))
