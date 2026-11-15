@@ -48,9 +48,9 @@ _MUSIC_FILES: dict[str, list[str]] = {
 
 _MUSIC_VOLUME = 0.5
 
-# 单独压低音量的音效：Enter 确认音（menu_ok）连按时会显吵，调小一档
+# 单独压低音量的音效：所有「确认」类按键（Enter 等共用 menu_ok）调小一档
 _SOUND_VOLUME = {
-    "menu_ok": 0.45,
+    "menu_ok": 0.7,
 }
 
 

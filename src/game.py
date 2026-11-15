@@ -2248,14 +2248,6 @@ class Game:
                 )
             y += height
 
-        # 底部进度条：让玩家看得出名单还要滚多久
-        track = pygame.Rect(0, config.SCREEN_H - 26, 560, 4)
-        track.centerx = center_x
-        pygame.draw.rect(self.screen, (60, 40, 40), track)
-        pygame.draw.rect(
-            self.screen, config.GOLD,
-            pygame.Rect(track.x, track.y, int(track.width * progress), track.height),
-        )
         if progress >= 1.0:
             self._draw_center_text(
                 "Enter 返回標題", config.PALE_GOLD, font=self.font,
