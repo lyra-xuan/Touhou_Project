@@ -19,6 +19,7 @@ def make_game() -> Game:
     game.boss = Boss(config.BOSS_START_X, config.BOSS_START_Y)
     game.director = StageDirector()
     game.bullets = []
+    game.boss_beams = []
     game.player_shots = []
     game.fairies = []
     game.fairy_kill_count = 0
@@ -49,6 +50,7 @@ def make_game() -> Game:
     game.lives = config.PLAYER_LIVES
     game.bombs = config.PLAYER_BOMB_START
     game.bomb_timer = 0.0
+    game.bomb_charge = 0.0
     game.invulnerable_timer = 0.0
     game.god_mode = False
     game.victory = False
@@ -58,10 +60,21 @@ def make_game() -> Game:
     game.score = 0
     game.hiscore = 10 ** 9
     game.power = config.PLAYER_POWER_START
+    game.power_time = 0.0
     game.item_total = 0
     game.phase_timer = config.BOSS_PHASE_TIME_LIMIT
     game.boss_flash = 0.0
     game.graze_fx_cooldown = 0.0
+    game.spell_announce_timer = 0.0
+    game.screen_shake = 0.0
+    game.skill_state = "ready"
+    game.skill_timer = 0.0
+    game.boss_skill_next_hp = config.BOSS_SKILL_FIRST_HP
+    game.boss_skill_timer = 0.0
+    game.boss_skill_recover = 0.0
+    game.boss_skill_announce_timer = 0.0
+    game.boss_skill_announce_name = ""
+    game.skill_flash = 0.0
 
     stub = pygame.Surface((8, 8), pygame.SRCALPHA)
     game.art = SimpleNamespace(  # type: ignore[assignment]
@@ -69,6 +82,10 @@ def make_game() -> Game:
         bullet_small={name: stub for name in ("red", "blue", "white")},
         bullet_mid={name: stub for name in ("red", "white")},
         bullet_large={"magenta": stub, "cyan": stub},
+        player_shots={
+            key: pygame.Surface((8, 8), pygame.SRCALPHA)
+            for key in ("lv1", "lv2", "lv3", "lv4")
+        },
         item_sprites={kind: stub for kind in config.ITEM_KINDS},
         item_halo=stub,
     )
@@ -132,8 +149,19 @@ class ItemEffectTests(unittest.TestCase):
 
         self.deep_collect(game, "power")
 
-        self.assertAlmostEqual(game.power, 1.0 + config.ITEM_POWER_GAIN)
+        self.assertAlmostEqual(game.power, 1.0 + config.POWER_GAIN_PICKUP)
         self.assertEqual(game.item_total, 1)
+
+    def test_power_item_can_pass_the_stage_growth_ceiling(self) -> None:
+        game = make_game()
+        game.director.stage_number = 1
+        game.power = config.POWER_STAGE_CURVE[0][1]      # 已达本关时间成长上限
+
+        self.deep_collect(game, "power")
+
+        self.assertAlmostEqual(
+            game.power, config.POWER_STAGE_CURVE[0][1] + config.POWER_GAIN_PICKUP
+        )
 
     def test_power_item_is_capped_at_maximum(self) -> None:
         game = make_game()
@@ -167,15 +195,13 @@ class ItemEffectTests(unittest.TestCase):
 class PowerSpreadTests(unittest.TestCase):
     def test_shot_offsets_grow_with_power(self) -> None:
         game = make_game()
+        counts = [len(config.POWER_TIERS[0][1])]
 
-        game.power = config.PLAYER_POWER_START
-        self.assertEqual(len(game._shot_offsets()), 1)
-
-        game.power = config.PLAYER_POWER_DOUBLE
-        self.assertEqual(len(game._shot_offsets()), 2)
-
-        game.power = config.ITEM_POWER_MAX
-        self.assertEqual(len(game._shot_offsets()), 4)
+        for threshold, offsets in config.POWER_TIERS[1:]:
+            game.power = threshold
+            counts.append(len(game._shot_offsets()))
+            self.assertEqual(counts[-1], len(offsets))
+            self.assertGreater(counts[-1], counts[-2])
 
     def test_full_power_fires_four_shots_per_volley(self) -> None:
         game = make_game()
@@ -185,6 +211,101 @@ class PowerSpreadTests(unittest.TestCase):
         game._spawn_player_shots(0.0)
 
         self.assertEqual(len(game.player_shots), 4)
+
+    def test_shot_sprite_follows_the_power_tier(self) -> None:
+        game = make_game()
+
+        for index, (threshold, _) in enumerate(config.POWER_TIERS):
+            game.power = threshold
+            self.assertIs(
+                game._player_shot_sprite(), game.art.player_shots[f"lv{index + 1}"]
+            )
+
+    def test_crossing_a_power_tier_raises_a_banner(self) -> None:
+        game = make_game()
+        game.power = config.POWER_TIERS[0][0]
+        game.power_up_timer = 0.0
+
+        game._add_power(config.POWER_TIERS[1][0] - config.POWER_TIERS[0][0])
+
+        self.assertAlmostEqual(game.power, config.POWER_TIERS[1][0])
+        self.assertGreater(game.power_up_timer, 0.0)
+        self.assertIn("POWER UP", game.power_up_text)
+
+    def test_power_gain_within_a_tier_raises_no_banner(self) -> None:
+        game = make_game()
+        game.power = config.PLAYER_POWER_START
+        game.power_up_timer = 0.0
+
+        game._add_power(config.POWER_GAIN_STEP)
+
+        self.assertAlmostEqual(
+            game.power, config.PLAYER_POWER_START + config.POWER_GAIN_STEP
+        )
+        self.assertEqual(game.power_up_timer, 0.0)
+
+
+class PowerGrowthTests(unittest.TestCase):
+    def test_time_growth_never_passes_the_stage_ceiling(self) -> None:
+        game = make_game()
+        game.director.stage_number = 1          # 第 1 关，上限为双发
+        game.power_time = 0.0
+
+        for _ in range(400):
+            game._update_power_growth(0.5)
+
+        self.assertAlmostEqual(game.power, config.POWER_STAGE_CURVE[0][1])
+
+    def test_later_stages_keep_growing_towards_full_power(self) -> None:
+        game = make_game()
+        game.director.stage_number = 3          # 第 3 关，上限为满火力
+        game.power_time = 0.0
+
+        for _ in range(400):
+            game._update_power_growth(0.5)
+
+        self.assertAlmostEqual(game.power, config.ITEM_POWER_MAX)
+
+    def test_each_stage_starts_from_its_own_floor(self) -> None:
+        for index, (floor, ceiling) in enumerate(config.POWER_STAGE_CURVE):
+            game = make_game()
+
+            game._reset_run(index)
+
+            self.assertAlmostEqual(game.power, floor)
+            self.assertLess(floor, ceiling)
+
+
+class BombRechargeTests(unittest.TestCase):
+    def test_bomb_recharges_to_max(self) -> None:
+        game = make_game()
+        game.bombs = config.PLAYER_BOMB_MAX - 1
+        game.bomb_charge = 0.0
+
+        game._recharge_bombs(config.PLAYER_BOMB_RECHARGE)
+
+        self.assertEqual(game.bombs, config.PLAYER_BOMB_MAX)
+        self.assertAlmostEqual(game.bomb_charge, 0.0)
+
+    def test_bomb_recharge_accumulates_below_max(self) -> None:
+        game = make_game()
+        game.bombs = 0
+        game.bomb_charge = 0.0
+
+        game._recharge_bombs(config.PLAYER_BOMB_RECHARGE / 2.0)
+
+        self.assertEqual(game.bombs, 0)
+        self.assertAlmostEqual(game.bomb_charge, config.PLAYER_BOMB_RECHARGE / 2.0)
+
+    def test_bomb_recharge_stops_at_max(self) -> None:
+        game = make_game()
+        game.bombs = config.PLAYER_BOMB_MAX
+        game.bomb_charge = 2.0
+
+        game._recharge_bombs(config.PLAYER_BOMB_RECHARGE * 2)
+
+        self.assertEqual(game.bombs, config.PLAYER_BOMB_MAX)
+        self.assertEqual(game.bomb_charge, 0.0)
 
 
 class FairyCombatTests(unittest.TestCase):
@@ -247,16 +368,16 @@ class FairyCombatTests(unittest.TestCase):
 class SpellPhaseTests(unittest.TestCase):
     """符卡切换：生命分段、换符卡掉落、超时推进。"""
 
-    def test_boss_health_splits_evenly_across_the_spell_cards(self) -> None:
+    def test_boss_health_uses_each_spell_cards_own_hp(self) -> None:
         boss = Boss(config.BOSS_START_X, config.BOSS_START_Y)
-        segment = boss.max_hp / boss.spell_count
+        phase_hps = [spell.hp for spell in boss.spec.spells]
 
         self.assertEqual(boss.phase, 1)
         for expected in range(2, boss.spell_count + 1):
-            boss.take_damage(segment)
+            boss.take_damage(phase_hps[expected - 2])
             self.assertEqual(boss.phase, expected)
             self.assertTrue(boss.alive)
-        boss.take_damage(segment)
+        boss.take_damage(phase_hps[-1])
         self.assertFalse(boss.alive)
 
     def test_entering_a_new_spell_drops_power_items(self) -> None:
@@ -267,8 +388,7 @@ class SpellPhaseTests(unittest.TestCase):
         self.assertEqual(game.boss_attack_phase, 1)
 
         # 把生命推到第二张符卡，再次推进即触发换卡
-        segment = game.boss.max_hp / game.boss.spell_count
-        game.boss.take_damage(segment + 0.5)
+        game.boss.take_damage(game.boss.phase_max_hp + 0.5)
         self.assertEqual(game.boss.phase, 2)
 
         game._update_boss_attacks(0.0)
@@ -280,8 +400,10 @@ class SpellPhaseTests(unittest.TestCase):
     def test_entering_the_last_spell_also_drops_a_life_item(self) -> None:
         game = make_game()
         game._update_boss_attacks(0.0)
-        segment = game.boss.max_hp / game.boss.spell_count
-        game.boss.take_damage(segment * (game.boss.spell_count - 1) + 0.5)
+        damage = sum(
+            spell.hp for spell in game.boss.spec.spells[:-1]
+        ) + 0.5
+        game.boss.take_damage(damage)
         self.assertEqual(game.boss.phase, game.boss.spell_count)
 
         game._update_boss_attacks(0.0)

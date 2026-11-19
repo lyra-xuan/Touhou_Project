@@ -18,6 +18,7 @@ def make_game() -> Game:
     game.boss = Boss(config.BOSS_START_X, config.BOSS_START_Y)
     game.director = StageDirector()
     game.bullets = []
+    game.boss_beams = []
     game.player_shots = []
     game.fairies = []
     game.fairy_kill_count = 0
@@ -50,6 +51,7 @@ def make_game() -> Game:
     game.lives = config.PLAYER_LIVES
     game.bombs = config.PLAYER_BOMB_START
     game.bomb_timer = 0.0
+    game.bomb_charge = 0.0
     game.invulnerable_timer = 0.0
     game.god_mode = False
     game.victory = False
@@ -59,10 +61,22 @@ def make_game() -> Game:
     game.score = 0
     game.hiscore = 10 ** 9
     game.power = config.PLAYER_POWER_START
+    game.power_time = 0.0
+    game.power_up_timer = 0.0
     game.item_total = 0
     game.phase_timer = config.BOSS_PHASE_TIME_LIMIT
     game.boss_flash = 0.0
     game.graze_fx_cooldown = 0.0
+    game.screen_shake = 0.0
+    game.skill_state = "ready"
+    game.skill_timer = 0.0
+    game.bullet_slow_timer = 0.0
+    game.boss_skill_next_hp = config.BOSS_SKILL_FIRST_HP
+    game.boss_skill_timer = 0.0
+    game.boss_skill_recover = 0.0
+    game.boss_skill_announce_timer = 0.0
+    game.boss_skill_announce_name = ""
+    game.skill_flash = 0.0
     stub = pygame.Surface((8, 8), pygame.SRCALPHA)
     game.art = SimpleNamespace(  # type: ignore[assignment]
         hit_spark=stub, graze_ring=stub, boss_burst=stub,
@@ -71,6 +85,7 @@ def make_game() -> Game:
         bullet_large={"magenta": stub, "cyan": stub},
         item_sprites={kind: stub for kind in config.ITEM_KINDS},
         item_halo=stub,
+        skill_sprites={"skill_player": stub, "skill_boss": stub},
     )
     game.audio = SimpleNamespace(  # type: ignore[assignment]
         play=lambda name: None,

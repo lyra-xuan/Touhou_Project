@@ -7,6 +7,7 @@ from src.art import (
     ENEMY_SETS,
     ITEM_LABELS,
     ITEM_RENDER,
+    PLAYER_SHOT_LEVELS,
     PORTRAIT_FILES,
     GameArt,
 )
@@ -74,6 +75,26 @@ class GameArtTests(unittest.TestCase):
         self.assertEqual(self.art.hit_spark.get_size(), (44, 44))
         self.assertEqual(self.art.graze_ring.get_size(), (34, 32))
         self.assertEqual(self.art.boss_burst.get_size(), (168, 174))
+        self.assertEqual(
+            set(self.art.skill_sprites), {"skill_player", "skill_boss"}
+        )
+        self.assertEqual(
+            self.art.skill_sprites["skill_player"].get_size(), (120, 120)
+        )
+        self.assertEqual(
+            self.art.skill_sprites["skill_boss"].get_size(), (144, 144)
+        )
+        self.assertEqual(
+            set(self.art.player_shot_trails), set(self.art.player_shots)
+        )
+        # 拖尾是「弹体 + 彗尾」整图：等宽、更高，且档位越高彗尾越长
+        heights = []
+        for key, sprite in self.art.player_shots.items():
+            trail = self.art.player_shot_trails[key]
+            self.assertEqual(trail.get_width(), sprite.get_width())
+            self.assertGreater(trail.get_height(), sprite.get_height())
+            heights.append(trail.get_height())
+        self.assertEqual(heights, sorted(heights))
         self.assertEqual(len(self.art.fairy_frames), 4)
         self.assertEqual(len(self.art.boss_faces), 3)
         self.assertEqual(self.art.boss_faces[0].get_size(), (176, 178))
@@ -114,6 +135,15 @@ class GameArtTests(unittest.TestCase):
                    for k in config.ITEM_KINDS]
         self.assertEqual(len(set(sprites)), len(config.ITEM_KINDS))
         self.assertIs(self.art.item_halo, self.art.graze_ring)
+
+    def test_player_shots_match_the_power_tier_table(self) -> None:
+        keys = tuple(key for key, _, _ in PLAYER_SHOT_LEVELS)
+        self.assertEqual(len(keys), len(config.POWER_TIERS))  # 档位与贴图一一对应
+        self.assertEqual(set(self.art.player_shots), set(keys))
+        sizes = [self.art.player_shots[key].get_size() for key in keys]
+        self.assertEqual(len(set(sizes)), len(keys))   # 各档外观尺寸各不相同
+        self.assertEqual(sizes, sorted(sizes))         # 档位越高弹体越大
+        self.assertIs(self.art.player_shots[keys[0]], self.art.player_shot)
 
     def test_player_sprite_drawing_preserves_collision_geometry(self) -> None:
         player = Player(400, 700)

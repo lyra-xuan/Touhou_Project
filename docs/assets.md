@@ -6,7 +6,7 @@
 
 ## 原作素材与音乐
 
-“非商业”本身不等于可以直接提取和使用原作游戏资源。东方Project使用规定案的公开整理文本注明，二次创作中禁止直接使用原作游戏的图像素材、音乐、文本和程序。本项目用户已确认标题页、战斗画面与音乐素材的许可均覆盖本项目使用；当前实际纳入的图片和来源记录在 `assets/title/ATTRIBUTION.md`、`assets/gameplay/ATTRIBUTION.md`，音效见 `assets/audio/ATTRIBUTION.md`，背景音乐见 `assets/bgm/ATTRIBUTION.md`。
+“非商业”本身不等于可以直接提取和使用原作游戏资源。东方Project使用规定案的公开整理文本注明，二次创作中禁止直接使用原作游戏的图像素材、音乐、文本和程序。本仓库的 MIT License 仅适用于代码，不覆盖游戏素材；素材仍归各自权利人所有。本项目用户已确认标题页、战斗画面与音乐素材的许可均覆盖本项目使用；当前实际纳入的图片和来源记录在 `assets/title/ATTRIBUTION.md`、`assets/ATTRIBUTION.md`，音效见 `assets/audio/ATTRIBUTION.md`，背景音乐见 `assets/bgm/ATTRIBUTION.md`。
 
 规则参考：[东方Project使用规定案（含原作素材使用条款）](https://thbwiki.cc/东方Project使用规定案)。这不是法律意见；使用素材时按已确认的许可范围执行并保留来源信息。
 
@@ -14,7 +14,7 @@
 
 ## 当前已接入
 
-战斗图像副本保存在 `assets/gameplay/`：三张关卡背景（人里近郊 / 雾之湖 / 红魔馆）、自机三组动画帧、中 Boss 与关底 Boss 立绘表情图集（自机与 6 名角色共 7 组）、大/中/小三种弹幕、玩家米弹、命中火花/擦弹光环/击破爆散特效，以及两组可击破杂兵动画。胜利流程使用红魔乡原作 `ED_DAT/end01.jpg` 作为后记背景、`ED_DAT/staff00.jpg` 作为鸣谢背景，并保留 `TL_DAT/result.jpg` 战绩插图；鸣谢页另从 `ED_DAT` 引入 6 张原作结局插画（`end02/end05/end06/end08/end10/end12.jpg` → `ending-roll-1~6.jpg`），在制作名单自下而上滚动时轮播淡入。「紅霧人物録」的「背景図鑑」页籤把这些整屏画面（三张关卡背景、四张结局图、战绩、标题、音楽室与六张结局插画，共 16 项）等比裁切后逐张翻阅。图集配套灰度遮罩在运行时按帧恢复透明边缘，来源与许可记录见 `assets/gameplay/ATTRIBUTION.md`。掉落道具复用弹型贴图并添加 PWR / PTS / 1UP 标记区分。
+战斗图像按类型保存在 `assets/character/`、`assets/bullet/`、`assets/effect/` 与 `assets/scene/`：包括三张关卡背景（人里近郊 / 雾之湖 / 红魔馆）、自机三组动画帧、中 Boss 与关底 Boss 立绘表情图集（自机与 6 名角色共 7 组）、大/中/小三种弹幕、玩家米弹、命中火花/擦弹光环/击破爆散特效，以及两组可击破杂兵动画。胜利流程使用红魔乡原作 `ED_DAT/end01.jpg` 作为后记背景、`ED_DAT/staff00.jpg` 作为鸣谢背景，并保留 `TL_DAT/result.jpg` 战绩插图；鸣谢页另从 `ED_DAT` 引入 6 张原作结局插画（`end02/end05/end06/end08/end10/end12.jpg` → `ending-roll-1~6.jpg`），在制作名单自下而上滚动时轮播淡入。「紅霧人物録」的「背景図鑑」页籤把这些整屏画面（三张关卡背景、四张结局图、战绩、标题、音楽室与六张结局插画，共 16 项）等比裁切后逐张翻阅。图集配套灰度遮罩在运行时按帧恢复透明边缘，来源与许可记录见 `assets/ATTRIBUTION.md`。掉落道具复用弹型贴图并添加 PWR / PTS / 1UP 标记区分。
 
 音效副本保存在 `assets/audio/`：发射、命中、擦弹、警报、自机死亡、击破、阶段切换与三个菜单音，来源与许可记录见 `assets/audio/ATTRIBUTION.md`。音频加载或音频设备不可用时静默降级，不影响游戏运行。
 
@@ -44,11 +44,11 @@ assets/
     ATTRIBUTION.md
     music-room.jpg
     touhou-th06-title.jpg
-  player/
-  boss/
-  bullets/
-  backgrounds/
-  effects/
+  character/
+  bullet/
+  effect/
+  scene/
+  ATTRIBUTION.md
   audio/
   bgm/
     ATTRIBUTION.md
@@ -67,4 +67,4 @@ assets/
 
 ## 当前策略
 
-玩家、Boss、弹幕、特效、妖精与音效均已使用 `assets/gameplay/` 和 `assets/audio/` 中的授权素材，背景音乐使用 `assets/bgm/` 中的授权原曲转码；程序绘制仅保留为贴图缺失时的回退。素材来源分别记录在 `assets/title/ATTRIBUTION.md`、`assets/gameplay/ATTRIBUTION.md`、`assets/audio/ATTRIBUTION.md` 和 `assets/bgm/ATTRIBUTION.md`。
+玩家、Boss、弹幕、特效、妖精与音效均已使用 `assets/character/`、`assets/bullet/`、`assets/effect/`、`assets/scene/` 和 `assets/audio/` 中的授权素材，背景音乐使用 `assets/bgm/` 中的授权原曲转码；程序绘制仅保留为贴图缺失时的回退。素材来源分别记录在 `assets/title/ATTRIBUTION.md`、`assets/ATTRIBUTION.md`、`assets/audio/ATTRIBUTION.md` 和 `assets/bgm/ATTRIBUTION.md`。

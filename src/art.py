@@ -12,7 +12,20 @@ import pygame
 
 from . import config
 
-_ASSET_ROOT = Path(__file__).resolve().parent.parent / "assets" / "gameplay"
+_ASSET_ROOT = Path(__file__).resolve().parent.parent / "assets"
+
+
+def _asset_path(name: str) -> Path:
+    """按素材命名前缀找到分类目录中的资源。"""
+    if name.startswith(("player-", "fairy-", "enemy", "portrait-", "boss-face-")):
+        category = "character"
+    elif name.startswith("bullet-"):
+        category = "bullet"
+    elif name.startswith(("effect-", "skill-")):
+        category = "effect"
+    else:
+        category = "scene"
+    return _ASSET_ROOT / category / name
 
 # --------------------------------------------------------------------------- #
 # 帧清单：格式 (x, y, w, h)，单位像素
@@ -36,9 +49,17 @@ BULLET_LARGE_RECTS = {
 }
 BULLET_LARGE_RENDER = (34, 34)
 
-# 米弹（etama3）：玩家射击使用直线型弹。
-BULLET_RICE_RECT = (103, 160, 17, 32)
-PLAYER_SHOT_RENDER = (14, 30)
+# 米弹（etama3）：玩家射击使用直线型弹。按火力分四档换色并放大，让火力成长
+# 肉眼可见：淡紫（单发）→ 青（双发）→ 绿（三发）→ 白（满火力四发）。
+# 顺序必须与 config.POWER_TIERS 一一对应。
+PLAYER_SHOT_LEVELS = (
+    ("lv1", (103, 160, 17, 32), (14, 30)),
+    ("lv2", (135, 160, 17, 32), (18, 38)),
+    ("lv3", (167, 160, 17, 32), (22, 46)),
+    ("lv4", (231, 160, 17, 32), (26, 54)),
+)
+# 自机弹拖尾长度（相对弹体高度的倍数）：档位越高拖尾越长，火力成长肉眼可见。
+PLAYER_SHOT_TAIL_LENGTHS = (0.9, 1.4, 1.9, 2.4)
 
 # 小玉（etama4）：y=241 一行 4 色，13×13，列距 64。
 BULLET_SMALL_RECTS = {
@@ -68,6 +89,14 @@ EFFECT_BURST_RECT = (3, 192, 61, 63)    # 击破爆散
 EFFECT_SPARK_SIZE = (44, 44)
 EFFECT_RING_SIZE = (34, 32)
 EFFECT_BURST_SIZE = (168, 174)
+
+# 特殊技能特效：同样是 eff00 里裁下的两枚，单独成文件便于日后替换。
+# 「空心光环」作自机蓄力 / 释放，「柔光宝珠」作 Boss 蓄力；键名对应
+# spells.SpecialSkill.sprite_key。
+SKILL_SPRITE_FILES = {
+    "skill_player": "skill-player.png",
+    "skill_boss": "skill-boss.png",
+}
 
 # 三关背景（ST_DAT/stg1bg、stg3bg、stg5bg）：三张图集的有效区域一致。
 STAGE_BG_RECT = (15, 15, 241, 210)
@@ -230,6 +259,33 @@ def _scale_cover(surface: pygame.Surface,
     return scaled.subsurface(rect).copy()
 
 
+def _trail(sprite: pygame.Surface, length: float,
+           segments: int = 6) -> pygame.Surface:
+    """把弹体拼成「弹体 + 彗尾」的整图并预烘焙，供 :class:`PlayerShot` 一次贴出。
+
+    尾巴由弹体本身逐段缩小、逐渐透明的副本叠成，越靠后越小越淡；因为用的是
+    弹体而非放大的模糊副本，边缘保持清晰，不会糊成一团。返回图宽度与弹体相同，
+    弹体位于顶部，调用方按「弹体中心」对齐即可。
+    """
+    width, height = sprite.get_size()
+    tail = max(6, round(height * length))
+    surface = pygame.Surface((width, height + tail), pygame.SRCALPHA)
+    for step in range(segments, 0, -1):
+        ratio = step / segments
+        scale = 1.0 - 0.6 * ratio
+        part = pygame.transform.smoothscale(
+            sprite,
+            (max(2, round(width * scale)), max(2, round(height * scale))),
+        )
+        part.set_alpha(int(160 * (1.0 - ratio) ** 1.3))
+        rect = part.get_rect(
+            center=(width // 2, round(height * 0.5 + tail * ratio))
+        )
+        surface.blit(part, rect)
+    surface.blit(sprite, sprite.get_rect(center=(width // 2, height // 2)))
+    return surface
+
+
 class GameArt:
     """整场游戏用到的背景、角色、弹幕与特效贴图。"""
 
@@ -239,7 +295,7 @@ class GameArt:
         def sheet(name: str) -> pygame.Surface:
             surface = sheets.get(name)
             if surface is None:
-                surface = pygame.image.load(str(_ASSET_ROOT / name))
+                surface = pygame.image.load(str(_asset_path(name)))
                 sheets[name] = surface
             return surface
 
@@ -298,11 +354,23 @@ class GameArt:
         )
 
         # ---------------- 玩家弹与敌方弹幕 ----------------
-        self.player_shot = pygame.transform.smoothscale(
-            _compose(sheet("bullet-a-sheet.png"), sheet("bullet-a-mask.png"),
-                     BULLET_RICE_RECT),
-            PLAYER_SHOT_RENDER,
-        )
+        self.player_shots = {
+            key: pygame.transform.smoothscale(
+                _compose(sheet("bullet-a-sheet.png"),
+                         sheet("bullet-a-mask.png"), rect),
+                size,
+            )
+            for key, rect, size in PLAYER_SHOT_LEVELS
+        }
+        self.player_shot = self.player_shots["lv1"]
+        # 自机弹拖尾：预烘焙「弹体 + 彗尾」整图（见 _trail），贴在弹体正后方；
+        # 档位越高弹体越大、彗尾越长，火力成长肉眼可见。
+        self.player_shot_trails = {
+            key: _trail(sprite, length)
+            for (key, sprite), length in zip(
+                self.player_shots.items(), PLAYER_SHOT_TAIL_LENGTHS
+            )
+        }
 
         self.bullet_large = {
             name: pygame.transform.smoothscale(frame, BULLET_LARGE_RENDER)
@@ -341,6 +409,9 @@ class GameArt:
         self.hit_spark = effect(EFFECT_SPARK_RECT, EFFECT_SPARK_SIZE)
         self.graze_ring = effect(EFFECT_RING_RECT, EFFECT_RING_SIZE)
         self.boss_burst = effect(EFFECT_BURST_RECT, EFFECT_BURST_SIZE)
+        self.skill_sprites = {
+            key: sheet(name) for key, name in SKILL_SPRITE_FILES.items()
+        }
         # ---------------- 杂兵（每关一套小型 / 大型） ----------------
         self.enemy_frames = {
             key: tuple(_fit_height(frame, height)

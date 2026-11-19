@@ -1,9 +1,13 @@
 # Gameplay Asset Credits
 
-The gameplay artwork and sound effects in this directory were copied from the
-user-provided `东方Project游戏开源素材库/TH06 东方红魔乡` asset package.
-Sprite sheets are shipped as a colour image plus a greyscale mask (`_a.png`);
-the mask's red channel becomes the alpha channel at load time.
+The gameplay artwork listed here was copied from the user-provided
+`东方Project游戏开源素材库/TH06 东方红魔乡` asset package. Images are organized
+under `character/`, `bullet/`, `effect/`, and `scene/`. Sprite sheets are shipped
+as a colour image plus a greyscale mask (`_a.png`); the mask's red channel
+becomes the alpha channel at load time.
+
+These assets remain the property of their respective rights holders and are
+not covered by this repository's MIT License, which applies to code only.
 
 Images (`CM_DAT` = character/bullet data, `ST_DAT` = stage data,
 `ED_DAT` = ending data, `TL_DAT` = title/menu data):
@@ -16,6 +20,10 @@ Images (`CM_DAT` = character/bullet data, `ST_DAT` = stage data,
 - `bullet-b-sheet.png` / `bullet-b-mask.png`: `CM_DAT/etama4.png` / `etama4_a.png`
   (small orbs, medium orbs, bursts)
 - `effect-sheet.png`: `CM_DAT/eff00.png` (already alpha-encoded)
+- `skill-player.png`: cropped from `CM_DAT/eff00.png` (hollow ring motif,
+  upscaled) — player special-skill charge/release aura
+- `skill-boss.png`: cropped from `CM_DAT/eff00.png` (soft glow orb, upscaled)
+  — Boss special-skill charge aura
 - `stage-bg.png` / `stage-bg-mask.png`: `ST_DAT/stg4bg.png` / `stg4bg_a.png`
   (kept for the older single-stage layout)
 - `fairy-sheet.png` / `fairy-mask.png`: `ST_DAT/stg1enm.png` / `stg1enm_a.png`
@@ -28,9 +36,10 @@ Images (`CM_DAT` = character/bullet data, `ST_DAT` = stage data,
 - `ending-defeat.jpg`: `ED_DAT/end00.jpg`
 - `ending-afterword.jpg`: `ED_DAT/end01.jpg` (original ending-scene illustration)
 - `ending-credits.jpg`: `ED_DAT/staff00.jpg` (original staff-roll background)
-- `ending-roll-1.jpg` ~ `ending-roll-6.jpg`: `ED_DAT/end02.jpg`, `end05.jpg`,
-  `end06.jpg`, `end08.jpg`, `end10.jpg`, `end12.jpg` (original ending
-  illustrations, cycled behind the scrolling staff roll)
+- `ending-roll-1.jpg` ~ `ending-roll-10.jpg`: `ED_DAT/end02.jpg`, `end05.jpg`,
+  `end06.jpg`, `end08.jpg`, `end10.jpg`, `end12.jpg`, `end04.jpg`, `end07.jpg`,
+  `end09.jpg`, `end11.jpg` (original ending illustrations, cycled behind the
+  scrolling staff roll)
 - `result-screen.jpg`: `TL_DAT/result.jpg` (original score/result screen artwork)
 
 ## Three-stage expansion
@@ -54,6 +63,9 @@ Dialogue and HUD character portraits (`ST_DAT` for enemies, `CM_DAT` for the
 player character):
 
 - `portrait-reimu-1/2/3`: `CM_DAT/face00a.png`, `face00b.png`, `face00c.png`
+  (the same `face00a.png` is also used, via `portrait-reimu-1.png`, as the
+  application icon: `assets/icon.png` for the window icon at runtime and
+  `icon.ico` for the packaged executable)
 - `portrait-rumia-1/2`: `ST_DAT/face03a.png`, `face03b.png`
 - `portrait-cirno-1`: `ST_DAT/face05a.png`
 - `portrait-meiling-1/2`: `ST_DAT/face06a.png`, `face06b.png`
@@ -64,8 +76,9 @@ player character):
 (The `_a` mask of each portrait follows the same source name, e.g.
 `portrait-rumia-1-mask.png` is `ST_DAT/face03a_a.png`.)
 
-Sound effects live in `../audio/` and come from `IN_DAT` (see the credits file
-there). Original Touhou Project artwork and audio are copyright © ZUN. The user
-confirmed that the provided material is licensed for use in this project.
+Sound effects live in `audio/` and come from `IN_DAT` (see
+`audio/ATTRIBUTION.md`). Original Touhou Project artwork and audio are copyright
+© ZUN. The user confirmed that the provided material is licensed for use in this
+project.
 Frames are extracted with the `_a.png` masks at runtime; source art is otherwise
 kept unchanged.

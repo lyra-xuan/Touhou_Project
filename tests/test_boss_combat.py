@@ -11,10 +11,10 @@ from unittest.mock import patch
 import pygame
 from pygame.math import Vector2
 
-from src import collision, config
+from src import collision, config, spells
 from src.director import BANNER, DONE, FIGHT, StageDirector
 from src.entities import Boss, Bullet, Player, PlayerShot
-from src.game import Game
+from src.game import Game, _load_font, _wrap_text_to_width
 
 
 def make_game() -> Game:
@@ -24,6 +24,7 @@ def make_game() -> Game:
     game.boss = Boss(config.BOSS_START_X, config.BOSS_START_Y)
     game.director = StageDirector()
     game.bullets = []
+    game.boss_beams = []
     game.player_shots = []
     game.shooting = False
     game.shoot_requested = False
@@ -33,6 +34,7 @@ def make_game() -> Game:
     game.spell_timers = []
     game.spell_imperilled = False
     game.spell_timed_out = False
+    game.spell_announce_timer = 0.0
     game.spells_captured = 0
     game.spells_failed = 0
     game.awarded_clear = 0
@@ -53,6 +55,7 @@ def make_game() -> Game:
     game.lives = config.PLAYER_LIVES
     game.bombs = config.PLAYER_BOMB_START
     game.bomb_timer = 0.0
+    game.bomb_charge = 0.0
     game.invulnerable_timer = 0.0
     game.god_mode = False
     game.cheat_prompt_active = False
@@ -69,6 +72,7 @@ def make_game() -> Game:
     game._credits_active = False
     game.quit_confirm_active = False
     game.quit_confirm_index = 1
+    game.quit_confirm_action = "quit"
     game.cg_tab = 0
     game.cg_background_index = 0
     game.background_gallery = ()
@@ -82,6 +86,7 @@ def make_game() -> Game:
         bullet_large={"magenta": stub, "cyan": stub},
         item_sprites={kind: stub for kind in config.ITEM_KINDS},
         item_halo=stub,
+        skill_sprites={"skill_player": stub, "skill_boss": stub},
     )
     game.audio = SimpleNamespace(  # type: ignore[assignment]
         play=lambda name: None,
@@ -95,9 +100,24 @@ def make_game() -> Game:
     game.score = 0
     game.hiscore = 10 ** 9        # 抬高上限，避免测试写盘
     game.power = config.PLAYER_POWER_START
+    game.power_time = 0.0
+    game.power_up_timer = 0.0
     game.item_total = 0
     game.boss_flash = 0.0
     game.graze_fx_cooldown = 0.0
+    game.screen_shake = 0.0
+    game.skill_state = "ready"
+    game.skill_timer = 0.0
+    game.bullet_slow_timer = 0.0
+    game.boss_skill_next_hp = config.BOSS_SKILL_FIRST_HP
+    game.boss_skill_timer = 0.0
+    game.boss_skill_recover = 0.0
+    game.boss_skill_announce_timer = 0.0
+    game.boss_skill_announce_name = ""
+    game.skill_flash = 0.0
+    game.skill_overlay = pygame.Surface(
+        (config.PLAYFIELD_WIDTH, config.PLAYFIELD_HEIGHT), pygame.SRCALPHA
+    )
     return game
 
 
@@ -316,6 +336,30 @@ class StageFlowTests(unittest.TestCase):
         dispatch_keys(game, pygame.K_LEFT)      # 切到「是」
         dispatch_keys(game, pygame.K_RETURN)
         self.assertFalse(game.running)
+
+    def test_gameplay_escape_asks_for_confirmation_instead_of_quitting(self) -> None:
+        game = make_game()
+
+        dispatch_keys(game, pygame.K_ESCAPE)
+
+        # 关卡内 Esc 只弹「返回标题」确认框，不会直接关闭程序
+        self.assertTrue(game.quit_confirm_active)
+        self.assertEqual(game.quit_confirm_action, "title")
+        self.assertTrue(game.running)
+        self.assertEqual(game.scene, Game.SCENE_PLAYING)
+
+    def test_gameplay_quit_confirmation_yes_returns_to_title(self) -> None:
+        game = make_game()
+
+        dispatch_keys(game, pygame.K_ESCAPE)      # 弹出「返回标题」确认框
+        dispatch_keys(game, pygame.K_LEFT)        # 切到「是」
+        dispatch_keys(game, pygame.K_RETURN)      # 确定
+
+        # 放弃本局回到标题，而不是关闭程序
+        self.assertFalse(game.quit_confirm_active)
+        self.assertEqual(game.scene, Game.SCENE_TITLE)
+        self.assertTrue(game.running)
+        self.assertFalse(game.paused)
 
     def test_gameplay_does_not_advance_while_on_title(self) -> None:
         game = make_game()
@@ -835,6 +879,304 @@ class GameOverAndEndingTests(unittest.TestCase):
 
         self.assertEqual(game.scene, Game.SCENE_TITLE)
         self.assertFalse(game.victory)
+
+
+class SpecialSkillTests(unittest.TestCase):
+    """自机与 Boss 的特殊技能：蓄力 → 释放 → 后摇。"""
+
+    def test_phase_and_skill_announcements_use_separate_rows(self) -> None:
+        game = make_game()
+        game.boss = Boss(
+            config.BOSS_START_X, config.BOSS_START_Y,
+            spec=spells.STAGE_BOSS_SPECS["remilia"],
+        )
+        game.spell_announce_timer = 1.0
+        game.boss_skill_announce_timer = 1.0
+        game.boss_skill_announce_name = "冥符「深紅の王威」"
+        game.screen = pygame.Surface((config.SCREEN_W, config.SCREEN_H))
+        pygame.font.init()
+        game.font = _load_font(24)
+        game.font_big = _load_font(44)
+        horizontal_lines: list[tuple[tuple[int, int], tuple[int, int], tuple]] = []
+        draw_line = pygame.draw.line
+
+        def capture_line(surface, color, start, end, width=1):
+            if start[1] == end[1]:
+                horizontal_lines.append((start, end, color))
+            return draw_line(surface, color, start, end, width)
+
+        with patch.object(pygame.draw, "line", side_effect=capture_line):
+            game._draw_spell_announcement()
+            game._draw_boss_skill_announcement()
+
+        phase_lines = [line for line in horizontal_lines if line[2] == config.GOLD]
+        skill_lines = [line for line in horizontal_lines if line[2] == config.RED]
+        self.assertEqual(len(phase_lines), 2)
+        self.assertEqual(len(skill_lines), 2)
+        phase_range = (min(line[0][1] for line in phase_lines),
+                       max(line[0][1] for line in phase_lines))
+        skill_range = (min(line[0][1] for line in skill_lines),
+                       max(line[0][1] for line in skill_lines))
+        self.assertTrue(
+            phase_range[1] < skill_range[0]
+            or skill_range[1] < phase_range[0]
+        )
+
+    def test_player_skill_uses_short_windup(self) -> None:
+        game = make_game()
+
+        game._use_player_skill()
+
+        self.assertAlmostEqual(game.skill_timer, 1.2)
+
+    def test_spell_announcement_wraps_to_measured_font_width(self) -> None:
+        pygame.font.init()
+        font = _load_font(28)
+        text = "黑暗中潜伏的红弹瞄准要害，紫弹之环缓缓合围。"
+
+        lines = _wrap_text_to_width(text, font, 180)
+
+        self.assertGreater(len(lines), 1)
+        self.assertTrue(all(font.size(line)[0] <= 180 for line in lines))
+
+    def test_boss_specials_have_distinct_multi_emitter_patterns(self) -> None:
+        specials = spells.SPECIAL_SKILLS
+        patterns = {
+            key: tuple(
+                (emitter.kind, emitter.count, emitter.step, emitter.offset,
+                 emitter.bullet, emitter.aim)
+                for emitter in special.emitters
+            )
+            for key, special in specials.items()
+        }
+
+        self.assertEqual(len(set(patterns.values())), len(specials))
+        beam_patterns = {
+            key: tuple(
+                (beam.width, beam.length, beam.telegraph, beam.duration,
+                 beam.color, beam.angle_offset)
+                for beam in special.beams
+            )
+            for key, special in specials.items()
+        }
+        self.assertEqual(len(set(beam_patterns.values())), len(specials))
+        self.assertTrue(all(len(special.emitters) >= 2 for special in specials.values()))
+        self.assertTrue(all(
+            sum(emitter.count for emitter in special.emitters) >= 60
+            for special in specials.values()
+        ))
+        self.assertTrue(all(special.beams for special in specials.values()))
+        self.assertTrue(all(
+            all(emitter.kind != "ring" for emitter in special.emitters)
+            for special in specials.values()
+        ))
+
+    def test_patchouli_special_releases_a_warning_beam(self) -> None:
+        game = make_game()
+        game.boss = Boss(
+            config.BOSS_START_X, config.BOSS_START_Y,
+            spec=spells.MIDBOSS_SPECS["patchouli"],
+        )
+        special = game.boss.spec.special
+
+        game._release_boss_skill(game.boss, special)
+
+        self.assertEqual(len(game.boss_beams), 2)
+        self.assertFalse(game.boss_beams[0].active)
+        self.assertEqual(
+            game.boss_beams[0].telegraph_remaining,
+            special.beams[0].telegraph,
+        )
+
+    def test_stage_one_rumia_special_releases_two_beams(self) -> None:
+        game = make_game()
+        game.boss = Boss(
+            config.BOSS_START_X, config.BOSS_START_Y,
+            spec=spells.STAGE_BOSS_SPECS["rumia"],
+        )
+
+        game._release_boss_skill(game.boss, game.boss.spec.special)
+
+        expected_bullets = sum(
+            emitter.count for emitter in game.boss.spec.special.emitters
+        )
+        self.assertEqual(len(game.bullets), expected_bullets)
+        self.assertEqual(len(game.boss_beams), 2)
+        self.assertEqual(
+            [beam.telegraph_remaining for beam in game.boss_beams],
+            [0.85, 0.85],
+        )
+
+    def test_remilia_special_releases_three_parallel_beams(self) -> None:
+        game = make_game()
+        game.boss = Boss(
+            config.BOSS_START_X, config.BOSS_START_Y,
+            spec=spells.STAGE_BOSS_SPECS["remilia"],
+        )
+        special = game.boss.spec.special
+
+        game._release_boss_skill(game.boss, special)
+
+        self.assertEqual(len(game.boss_beams), 3)
+        first_direction = game.boss_beams[0].direction
+        for beam in game.boss_beams[1:]:
+            self.assertAlmostEqual(beam.direction.x, first_direction.x)
+            self.assertAlmostEqual(beam.direction.y, first_direction.y)
+        self.assertAlmostEqual(
+            game.boss_beams[0].origin.distance_to(game.boss_beams[1].origin),
+            68.0,
+        )
+        self.assertAlmostEqual(
+            game.boss_beams[1].origin.distance_to(game.boss_beams[2].origin),
+            68.0,
+        )
+
+    def test_every_boss_releases_its_configured_beams_and_bullets(self) -> None:
+        for key, spec in spells.MIDBOSS_SPECS.items():
+            with self.subTest(boss=key):
+                game = make_game()
+                game.boss = Boss(
+                    config.BOSS_START_X, config.BOSS_START_Y, spec=spec
+                )
+                special = spec.special
+
+                game._release_boss_skill(game.boss, special)
+
+                self.assertEqual(len(game.boss_beams), len(special.beams))
+                self.assertEqual(
+                    len(game.bullets),
+                    sum(emitter.count for emitter in special.emitters),
+                )
+
+    def test_player_skill_charges_then_slows_bullets(self) -> None:
+        game = make_game()
+        game.bullets = [
+            Bullet(game.player.pos.x + 80.0, game.player.pos.y - 60.0, 0.0, 120.0),
+            Bullet(game.player.pos.x - 80.0, game.player.pos.y - 60.0, 0.0, 120.0),
+        ]
+        before = list(game.bullets)
+
+        game._use_player_skill()
+        self.assertEqual(game.skill_state, "charge")
+        self.assertAlmostEqual(game.skill_timer, config.PLAYER_SKILL_CHARGE_TIME)
+
+        game._update_player_skill(config.PLAYER_SKILL_CHARGE_TIME)
+        self.assertEqual(game.skill_state, "recover")
+        # 不再清弹，而是令敌弹进入减速（时间凝滞）
+        self.assertEqual(game.bullets, before)
+        self.assertAlmostEqual(
+            game.bullet_slow_timer, config.PLAYER_SKILL_SLOW_DURATION
+        )
+        self.assertGreater(game.screen_shake, 0.0)
+
+        game._update_player_skill(config.SKILL_RECOVER_TIME)
+        self.assertEqual(game.skill_state, "ready")
+
+    def test_time_slow_reduces_enemy_bullet_speed(self) -> None:
+        game = make_game()
+        game.boss = None
+        start_y = config.PLAYFIELD_TOP + 80.0
+        bullet = Bullet(game.player.pos.x + 120.0, start_y, 0.0, 240.0)
+        game.bullets = [bullet]
+        game.bullet_slow_timer = config.PLAYER_SKILL_SLOW_DURATION
+
+        with patch.object(game, "_read_player_input", return_value=(False, False)):
+            game.update(0.1)
+
+        travelled = bullet.pos.y - start_y
+        self.assertAlmostEqual(
+            travelled, 240.0 * 0.1 * config.PLAYER_SKILL_SLOW_FACTOR, places=3
+        )
+
+    def test_player_skill_cannot_retrigger_while_charging(self) -> None:
+        game = make_game()
+        game._use_player_skill()
+        game._update_player_skill(config.PLAYER_SKILL_CHARGE_TIME / 2.0)
+
+        game._use_player_skill()
+
+        self.assertEqual(game.skill_state, "charge")
+        self.assertAlmostEqual(
+            game.skill_timer, config.PLAYER_SKILL_CHARGE_TIME / 2.0
+        )
+
+    def test_being_hit_does_not_interrupt_the_charging_skill(self) -> None:
+        game = make_game()
+        game._use_player_skill()
+        self.assertEqual(game.skill_state, "charge")
+
+        game._on_player_hit(
+            Bullet(game.player.pos.x, game.player.pos.y, 0.0, 0.0)
+        )
+
+        # 蓄力不再被击断，短前摇时间凝滞仍可正常放出
+        self.assertEqual(game.skill_state, "charge")
+
+    def test_boss_skill_triggers_by_hp_threshold(self) -> None:
+        game = make_game()
+        game.boss = Boss(
+            config.BOSS_START_X, config.BOSS_START_Y,
+            spec=spells.STAGE_BOSS_SPECS["remilia"],
+        )
+        special = game.boss.spec.special
+        self.assertIsNotNone(special)
+
+        # 满血时不该发动
+        self.assertFalse(game._update_boss_skill(0.0))
+
+        # 血量跌破首个阈值即发动，且阈值按比例下移
+        game.boss.hp = game.boss.max_hp * (config.BOSS_SKILL_FIRST_HP - 0.05)
+        game.spell_announce_timer = 0.0
+        self.assertTrue(game._update_boss_skill(0.0))
+        self.assertAlmostEqual(game.boss_skill_timer, special.charge)
+        self.assertAlmostEqual(
+            game.boss_skill_next_hp,
+            config.BOSS_SKILL_FIRST_HP * config.BOSS_SKILL_HP_FACTOR,
+        )
+
+        # 蓄力结束：铺开一圈专属弹幕、震屏、全屏闪光并进入后摇
+        self.assertTrue(game._update_boss_skill(special.charge))
+        expected_bullets = sum(
+            emitter.count for emitter in special.emitters
+        )
+        self.assertEqual(len(game.bullets), expected_bullets)
+        self.assertGreater(game.screen_shake, config.SKILL_SHAKE)
+        self.assertGreater(game.skill_flash, 0.0)
+        self.assertEqual(
+            game.skill_overlay.get_at((0, 0))[:3], special.flash_color
+        )
+        self.assertGreater(game.boss_skill_announce_timer, 0.0)
+        self.assertAlmostEqual(game.boss_skill_recover, special.recover)
+
+        # 后摇结束后血量未再跌破新阈值时不再发动
+        game._update_boss_skill(special.recover)
+        self.assertFalse(game._update_boss_skill(0.0))
+
+        # 血量继续下降跌破新阈值：再次发动，血量越低越频繁
+        game.boss.hp = game.boss.max_hp * (game.boss_skill_next_hp - 0.01)
+        self.assertTrue(game._update_boss_skill(0.0))
+
+    def test_boss_without_special_skill_never_triggers(self) -> None:
+        game = make_game()
+        spec = spells.BossSpec(
+            key="dummy", title="無",
+            spells=spells.STAGE_BOSS_SPECS["remilia"].spells,
+        )
+        game.boss = Boss(config.BOSS_START_X, config.BOSS_START_Y, spec=spec)
+        game.boss.hp = game.boss.max_hp * 0.1
+
+        self.assertFalse(game._update_boss_skill(0.0))
+        self.assertAlmostEqual(game.boss_skill_next_hp, config.BOSS_SKILL_FIRST_HP)
+
+    def test_boss_skill_announcement_timer_decays(self) -> None:
+        game = make_game()
+        game.boss_skill_announce_timer = 2.0
+        game.boss_skill_announce_name = "冥符「深紅の王威」"
+
+        with patch.object(game, "_read_player_input", return_value=(False, False)):
+            game.update(0.1)
+
+        self.assertLess(game.boss_skill_announce_timer, 2.0)
 
 
 class ResetRunTests(unittest.TestCase):

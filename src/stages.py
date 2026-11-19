@@ -23,16 +23,16 @@ from .waves import WaveSpec
 # --------------------------------------------------------------------------- #
 # 杂兵弹型：小妖精打三向瞄准弹，大妖精打环形封路弹
 # --------------------------------------------------------------------------- #
-FAN_THREE = Emitter(kind="fan", interval=2.10, count=3, step=14.0,
-                    speed=185.0, bullet="small_blue", aim=True)
-FAN_FIVE = Emitter(kind="fan", interval=2.50, count=4, step=11.0,
-                   speed=195.0, bullet="small_red", aim=True)
-RING_FOUR = Emitter(kind="ring", interval=2.60, count=3, speed=145.0,
+FAN_THREE = Emitter(kind="fan", interval=2.60, count=3, step=16.0,
+                    speed=170.0, bullet="small_blue", aim=True)
+FAN_FIVE = Emitter(kind="fan", interval=3.10, count=4, step=13.0,
+                   speed=180.0, bullet="small_red", aim=True)
+RING_FOUR = Emitter(kind="ring", interval=3.20, count=3, speed=135.0,
                     bullet="mid_white")
-RING_SIX = Emitter(kind="ring", interval=2.90, count=5, speed=160.0,
+RING_SIX = Emitter(kind="ring", interval=3.60, count=5, speed=145.0,
                    bullet="large_cyan")
-SPIRAL_SLIM = Emitter(kind="spiral", interval=0.65, count=1, speed=175.0,
-                      spin=21.0, bullet="small_green")
+SPIRAL_SLIM = Emitter(kind="spiral", interval=0.85, count=1, speed=160.0,
+                      spin=18.0, bullet="small_green")
 
 
 # --------------------------------------------------------------------------- #
@@ -117,18 +117,16 @@ class StageScript:
 # 第一关：红雾下的人里近郊
 # --------------------------------------------------------------------------- #
 _STAGE1_WAVES = (
-    WaveSpec(formation="line", count=5, frames="small1", spread=0.16,
-             delay=0.4),
-    WaveSpec(formation="arc", count=4, frames="small1", spread=0.28,
+    WaveSpec(formation="line", count=4, frames="small1", spread=0.16,
+             delay=0.5),
+    WaveSpec(formation="arc", count=4, frames="small1", spread=0.30,
              attack=FAN_THREE),
-    WaveSpec(formation="sides", count=5, frames="small1", spread=0.30,
-             sway=34.0),
     WaveSpec(formation="column", count=2, frames="large1", hp=90.0,
              hover_y=config.PLAYFIELD_TOP + 250.0, hover_time=3.2,
              speed=110.0, sway=44.0, drop="power", attack=RING_FOUR),
-    WaveSpec(formation="vee", count=6, frames="small1", spread=0.22,
+    WaveSpec(formation="vee", count=5, frames="small1", spread=0.24,
              attack=FAN_THREE),
-    WaveSpec(formation="chase", count=5, frames="large1", hp=70.0,
+    WaveSpec(formation="chase", count=4, frames="large1", hp=70.0,
              speed=95.0, sway=30.0, attack=FAN_FIVE),
 )
 
@@ -176,14 +174,12 @@ _STAGE1_BOSS_POST = Scene(
 # 第二关：雾之湖
 # --------------------------------------------------------------------------- #
 _STAGE2_WAVES = (
-    WaveSpec(formation="arc", count=5, frames="small2", spread=0.20,
+    WaveSpec(formation="arc", count=4, frames="small2", spread=0.20,
              delay=0.4, attack=FAN_THREE),
-    WaveSpec(formation="chase", count=5, frames="small2", speed=82.0,
-             spread=0.24, attack=FAN_THREE),
     WaveSpec(formation="line", count=4, frames="large2", hp=100.0,
              hover_y=config.PLAYFIELD_TOP + 220.0, hover_time=3.6,
              speed=105.0, drop="power", attack=RING_SIX),
-    WaveSpec(formation="sides", count=6, frames="small2", sway=40.0,
+    WaveSpec(formation="sides", count=5, frames="small2", sway=40.0,
              spread=0.26, attack=FAN_THREE),
     WaveSpec(formation="vee", count=5, frames="large2", hp=80.0, speed=92.0,
              attack=RING_FOUR),
@@ -233,19 +229,17 @@ _STAGE2_BOSS_POST = Scene(
 # 第三关：红魔馆
 # --------------------------------------------------------------------------- #
 _STAGE3_WAVES = (
-    WaveSpec(formation="line", count=5, frames="small3", spread=0.18,
+    WaveSpec(formation="line", count=4, frames="small3", spread=0.18,
              delay=0.4, attack=FAN_THREE),
-    WaveSpec(formation="vee", count=6, frames="small3", spread=0.20,
+    WaveSpec(formation="vee", count=5, frames="small3", spread=0.20,
              attack=FAN_FIVE),
     WaveSpec(formation="column", count=3, frames="large3", hp=110.0,
              hover_y=config.PLAYFIELD_TOP + 200.0, hover_time=3.8,
              speed=100.0, drop="power", attack=RING_SIX),
-    WaveSpec(formation="chase", count=5, frames="small3", speed=90.0,
+    WaveSpec(formation="chase", count=4, frames="small3", speed=90.0,
              spread=0.22, attack=SPIRAL_SLIM),
-    WaveSpec(formation="sides", count=6, frames="large3", hp=90.0,
+    WaveSpec(formation="sides", count=5, frames="large3", hp=90.0,
              speed=96.0, attack=RING_FOUR),
-    WaveSpec(formation="arc", count=6, frames="small3", spread=0.20,
-             attack=FAN_FIVE),
 )
 
 _STAGE3_INTRO = Scene(

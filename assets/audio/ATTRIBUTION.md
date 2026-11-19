@@ -4,6 +4,9 @@ The sound effects in this directory were copied from the user-provided
 `东方Project游戏开源素材库/TH06 东方红魔乡` asset package, `IN_DAT` (interface
 and sound data). Each file was renamed to describe its role in this project:
 
+These assets remain the property of their respective rights holders and are
+not covered by this repository's MIT License, which applies to code only.
+
 | File | Source in `IN_DAT` |
 |---|---|
 | `player-shot.wav` | `plst00` |

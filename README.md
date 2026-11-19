@@ -1,5 +1,11 @@
 # 东方红雾录
 
+**课程项目：问题求解大作业 · 四川大学计算机学院** ｜ 完成日期：2026-11 ｜ Python 3.12 · pygame-ce · PyInstaller · GitHub Actions
+
+**验收信息：三关完整流程 · 173 项自动化测试通过**
+
+> **素材版权说明**：东方Project相关素材版权归 ZUN / 上海爱丽丝幻乐团等各自权利人所有。本仓库的 MIT 许可仅适用于代码，不适用于游戏素材；来源与说明见下方「素材与许可」。
+
 > 一款致敬《东方红魔乡》的 2D 弹幕射击游戏。用 Python + pygame-ce 从零实现碰撞检测、关卡状态机与数据驱动的符卡系统，三关完整流程可通关。
 
 ---
@@ -85,7 +91,7 @@ bash build.sh
 
 ## 🚀 发版流程
 
-1. 在 [.github/release-notes](.github/release-notes) 下按版本号新建说明文件（如 `v1.0.5.md`），写明本版的**新增功能**与**问题修复**。
+1. 在 [.github/release-notes](.github/release-notes) 下按版本号新建说明文件（如 `v1.0.5.md`），先注明素材版权归属，再写本版的**新增功能**与**问题修复**。
 2. 打 tag 并推送：
 
 ```bash
@@ -109,9 +115,19 @@ src/
   entities.py           玩家、Boss、妖精、子弹、道具、特效
   collision.py          几何碰撞与空间网格
   art.py                背景、角色、弹幕、特效图片加载
+  battle.py             战斗更新、碰撞、波次与道具逻辑
+  hud.py                HUD 与战斗提示绘制
+  render.py             菜单、结局与场景绘制
   audio.py              音效与背景音乐（失败时静默降级）
-  game.py               输入、游戏循环、碰撞与渲染
-assets/                 战斗素材、音效、背景音乐、标题图（含来源说明）
+  game.py               输入分发、状态调度与主循环
+assets/
+  character/            自机、妖精、Boss 与立绘
+  bullet/               弹幕图集与遮罩
+  effect/               命中特效与技能光效
+  scene/                关卡背景与结局插画
+  title/                标题与菜单背景
+  audio/ bgm/           音效与背景音乐（含来源说明）
+  ATTRIBUTION.md        战斗美术素材来源与许可
 tests/                  回归测试
 docs/                   需求、制作指南、素材清单
 .github/                CI 工作流与按版本号存放的发版说明
@@ -125,16 +141,20 @@ docs/                   需求、制作指南、素材清单
 - 关卡状态机：`StageDirector` 驱动剧本步骤序列
 - **PyInstaller** 单文件打包 + **GitHub Actions** 跨平台 CI
 
-## 🙏 素材与许可
+## 许可
 
-本项目为致敬《东方红魔乡》的非商业同人作品。游戏中使用的东方角色、立绘、背景、弹幕与特效素材来自东方红魔乡原作，背景音乐为 PC-98 时期东方原曲的转码版本。各素材的具体来源与许可说明见：
+### 代码
+
+本仓库代码采用 MIT License，详见 [LICENSE](LICENSE)。
+
+### 游戏素材
+
+游戏中的东方Project角色、立绘、背景、弹幕、特效与音乐版权归 ZUN / 上海爱丽丝幻乐团等各自权利人所有，不属于上述 MIT 代码许可。其他素材也归其各自权利人所有。来源记录见：
 
 - `assets/title/ATTRIBUTION.md`
-- `assets/gameplay/ATTRIBUTION.md`
+- `assets/ATTRIBUTION.md`
 - `assets/audio/ATTRIBUTION.md`
 - `assets/bgm/ATTRIBUTION.md`
-
-本项目代码部分按个人偏好授权，仅供学习交流，请勿用于商业用途。
 
 ---
 

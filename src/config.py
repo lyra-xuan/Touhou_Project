@@ -41,8 +41,28 @@ PLAYER_START_Y = PLAYFIELD_BOTTOM - 120
 # ---------- 玩家 ----------
 PLAYER_SPEED = 560.0        # 像素/秒
 PLAYER_FOCUS_FACTOR = 0.45  # 按住 Shift 低速移动时的速度系数
-PLAYER_POWER_START = 1.00   # 初始火力：1.00 单发
-PLAYER_POWER_DOUBLE = 2.00  # 达到该火力后双发，满火力（ITEM_POWER_MAX）四发
+PLAYER_POWER_START = 1.00   # 默认初始火力（实际以 POWER_STAGE_CURVE 的关卡保底为准）
+POWER_UP_BANNER_DURATION = 0.9  # 自机升档时「火力上昇」提示的显示时长（秒）
+# 火力档位表：(进入该档所需的火力下界, 自机弹的横向偏移)。
+# 依次为 单发 → 双发 → 三发 → 满火力四发；要加档位就往这里追加一行，
+# 并在 art.PLAYER_SHOT_LEVELS 里补一张同序号的贴图。
+POWER_TIERS = (
+    (1.00, (0.0,)),
+    (2.00, (-10.0, 10.0)),
+    (3.00, (-14.0, 0.0, 14.0)),
+    (4.00, (-18.0, -6.0, 6.0, 18.0)),
+)
+# 火力成长：战斗中每隔 POWER_TIME_STEP_SECONDS 秒自动 +POWER_GAIN_STEP，
+# 但不会超过当前关卡的上限；拾取红玉额外 +POWER_GAIN_PICKUP，可突破上限。
+POWER_TIME_STEP_SECONDS = 2.5
+POWER_GAIN_STEP = 0.05
+POWER_GAIN_PICKUP = 0.10
+# 每关的火力曲线：(关卡开始时的保底火力, 该关自动成长的上限)
+POWER_STAGE_CURVE = (
+    (1.00, 2.00),   # 第 1 关：1.00 起步，最多自动升到双发
+    (2.00, 3.00),   # 第 2 关：保底双发，最多自动升到三发
+    (3.00, 4.00),   # 第 3 关：保底三发，自动升到满火力
+)
 PLAYER_HIT_RADIUS = 4.5     # 命中判定半径（弹幕游戏惯例：极小）
 PLAYER_GRAZE_RADIUS = 27.0  # 擦弹判定半径（外层）
 PLAYER_START_MARGIN = 120.0
@@ -87,6 +107,31 @@ GRAZE_RING_DURATION = 0.28
 BURST_DURATION = 0.60
 BOSS_FLASH_DURATION = 0.16
 
+# ---------- 打击感 ----------
+HIT_SPARK_END_SCALE = 1.35   # 命中火花的最终缩放（原先 1.1，放大更醒目）
+HIT_SPARK_SHAKE = 3.0        # 玩家弹命中 Boss / 妖精时的微幅震屏幅度（像素）
+PLAYER_HIT_SHAKE = 16.0      # 自机被命中时的震屏幅度（像素）
+SCREEN_SHAKE_DECAY = 46.0    # 震屏幅度每秒衰减速度（像素/秒）
+
+# ---------- 特殊技能（蓄力 → 释放 → 后摇） ----------
+SKILL_CHARGE_TIME = 1.2      # Boss 特殊技能的默认蓄力时长（秒）
+SKILL_RECOVER_TIME = 0.8     # 后摇时长（秒）
+SKILL_SHAKE = 14.0           # 释放特殊技能时的震屏幅度（像素）
+SKILL_SHOCKWAVE_DURATION = 0.55  # 释放瞬间扩散的冲击波光环时长（秒）
+
+# 自机特技（C 键）：短蓄力发动「时间凝滞」，令全场敌弹整体减速。
+# 不清弹、也不对 Boss 造成伤害，纯粹是争取走位窗口的保命 / 反攻手段。
+PLAYER_SKILL_NAME = "夢符「二重結界」"
+PLAYER_SKILL_CHARGE_TIME = 1.2     # 自机特技的短蓄力时长（秒）
+PLAYER_SKILL_SLOW_FACTOR = 0.25    # 技能期间敌弹速度倍率（越慢越像时间凝滞）
+PLAYER_SKILL_SLOW_DURATION = 5.0   # 敌弹减速的持续时长（秒）
+
+# Boss 特殊技能：按剩余血量比例分档发动，且档位间距逐次收窄，
+# 于是血量越低发动得越频繁。每个 Boss 都有自己的多段弹幕组合与主题色。
+BOSS_SKILL_FIRST_HP = 0.80    # 首次触发的血量比例
+BOSS_SKILL_HP_FACTOR = 0.7    # 每次触发后阈值按此比例下移（越小越低血量时越频繁）
+BOSS_SKILL_FLASH = 0.40       # 释放瞬间的全屏闪光时长（秒）
+
 # ---------- 弹幕场暗角 ----------
 VIGNETTE_COLOR = (10, 3, 9)
 VIGNETTE_MAX_ALPHA = 205
@@ -97,8 +142,7 @@ ITEM_FALL_SPEED = 120.0     # 匀速下落速度（像素/秒）
 ITEM_MAGNET_RADIUS = 120.0  # 自机吸附范围
 ITEM_MAGNET_SPEED = 560.0   # 吸附时的收拢速度
 ITEM_COLLECT_LINE = PLAYFIELD_TOP + 112.0  # 到达此高度即自动回收全屏道具
-ITEM_POWER_MAX = 4.00       # 火力上限
-ITEM_POWER_GAIN = 0.05      # 每枚 Power 道具增加的火力
+ITEM_POWER_MAX = 4.00       # 火力上限（满火力四发）
 ITEM_POINT_SCORE = 500      # 每枚 Point 道具的得分
 ITEM_POWER_FULL_SCORE = 1000  # 满火力时拾取 Power 折算的分数
 # 道具种类 -> 素材名；素材复用现有弹型贴图（红=火力，青=点数，绿=1UP）
@@ -110,7 +154,7 @@ ITEM_KIND_COLORS = {
 }
 
 # ---------- 杂兵 ----------
-FAIRY_HP = 20.0            # 击破所需的伤害
+FAIRY_HP = 16.0            # 击破所需的伤害
 FAIRY_RADIUS = 22.0        # 命中判定半径
 FAIRY_POINT_DROPS = 1      # 每只击破妖精掉落的道具数
 FAIRY_DROP_PATTERN = ("point", "power", "point")
@@ -123,13 +167,16 @@ STAGE_CLEAR_BONUS = 20000        # 通过一关的结算奖励
 MIDBOSS_SCORE = 8000             # 击破中 Boss 的得分
 BOSS_SPELL_BASE_BONUS = 2000     # 破符基础奖励
 BOSS_SPELL_TIME_BONUS = 600      # 破符时每剩余 1 秒追加的奖励
-MIDBOSS_HP = 260.0               # 中 Boss 总生命值
+MIDBOSS_HP = 650.0               # 中 Boss 总生命值
 STAGE_CLEAR_DELAY = 1.4          # Boss 击破后到下一关/结局的停留时间
 
 # ---------- 玩家符卡 · 灵击（Bomb） ----------
 PLAYER_BOMB_START = 3            # 初始符卡数
+PLAYER_BOMB_MAX = 5              # 符卡上限
+PLAYER_BOMB_RECHARGE = 4.0       # 每 4 秒自动回复 1 枚
+PLAYER_BOMB_REUSE_GAP = 0.5      # 本次灵击结束后 0.5s 即可再次使用
 PLAYER_BOMB_DURATION = 2.6       # 灵击持续（无敌 + 清弹）时间
-PLAYER_BOMB_RADIUS = 320.0       # 灵击生效半径
+PLAYER_BOMB_RADIUS = 360.0       # 灵击生效半径
 PLAYER_BOMB_BULLET_SCORE = 100   # 被灵击消去的每颗子弹折算分数
 PLAYER_BOMB_CLEAR_ITEM_CAP = 24  # 灵击最多化作的道具数，避免刷屏
 PLAYER_BOMB_NAME = "霊符「夢想封印」"
@@ -148,3 +195,6 @@ DEBUG_GRID_ALPHA = 80
 DEBUG_HIT_COLOR = (255, 92, 92)      # 命中区（内层，致命）
 DEBUG_GRAZE_COLOR = (120, 196, 255)  # 擦弹区（外层，不致命）
 DEBUG_SWEEP_COLOR = (255, 198, 104)  # 本帧扫掠线段
+
+# ---------- 存档调试 ----------
+DEBUG_PERSISTENCE = False   # 打开后会在存档写入失败时打印原因

@@ -138,6 +138,90 @@ class Bullet(Entity):
         pygame.draw.circle(surface, config.WHITE, center, max(1, r // 2))
 
 
+class BossBeam:
+    """Boss 的直线激光：先显示预警线，再以粗亮光束持续造成伤害。"""
+
+    def __init__(
+            self, x: float, y: float, angle: float, length: float,
+            width: float, telegraph: float, duration: float,
+            color: tuple[int, int, int]) -> None:
+        self.origin = Vector2(x, y)
+        self.direction = Vector2(math.cos(angle), math.sin(angle))
+        self.length = length
+        self.width = width
+        self.telegraph_remaining = max(0.0, telegraph)
+        self.active_remaining = max(0.0, duration)
+        self.color = color
+        self.alive = True
+
+    @property
+    def end(self) -> Vector2:
+        return self.origin + self.direction * self.length
+
+    @property
+    def active(self) -> bool:
+        return self.alive and self.telegraph_remaining <= 0.0
+
+    def update(self, dt: float) -> None:
+        remaining_dt = max(0.0, dt)
+        if self.telegraph_remaining > 0.0:
+            warning_dt = min(self.telegraph_remaining, remaining_dt)
+            self.telegraph_remaining -= warning_dt
+            remaining_dt -= warning_dt
+        if self.telegraph_remaining <= 0.0:
+            self.active_remaining = max(0.0, self.active_remaining - remaining_dt)
+            if self.active_remaining <= 0.0:
+                self.alive = False
+
+    def collides_circle(self, x: float, y: float, radius: float) -> bool:
+        """判断激光线段与圆形命中判定是否相交。"""
+        if not self.active:
+            return False
+        end = self.end
+        dx, dy = end.x - self.origin.x, end.y - self.origin.y
+        length_sq = dx * dx + dy * dy
+        if length_sq <= 1e-9:
+            return False
+        projection = (
+            (x - self.origin.x) * dx + (y - self.origin.y) * dy
+        ) / length_sq
+        projection = max(0.0, min(1.0, projection))
+        closest_x = self.origin.x + projection * dx
+        closest_y = self.origin.y + projection * dy
+        reach = max(0.0, radius) + self.width / 2.0
+        return ((x - closest_x) ** 2 + (y - closest_y) ** 2
+                <= reach * reach)
+
+    def draw(self, surface: pygame.Surface) -> None:
+        if not self.alive:
+            return
+        old_clip = surface.get_clip()
+        field = pygame.Rect(
+            config.PLAYFIELD_LEFT, config.PLAYFIELD_TOP,
+            config.PLAYFIELD_WIDTH, config.PLAYFIELD_HEIGHT,
+        )
+        surface.set_clip(old_clip.clip(field))
+        start = (round(self.origin.x), round(self.origin.y))
+        end = (round(self.end.x), round(self.end.y))
+        if self.active:
+            outer = tuple(channel // 3 for channel in self.color)
+            core = tuple((channel + 255) // 2 for channel in self.color)
+            pygame.draw.line(
+                surface, outer, start, end, max(1, round(self.width + 16))
+            )
+            pygame.draw.line(
+                surface, self.color, start, end, max(1, round(self.width))
+            )
+            pygame.draw.line(
+                surface, core, start, end, max(2, round(self.width / 5))
+            )
+        else:
+            warning = tuple(max(70, channel // 2) for channel in self.color)
+            pygame.draw.line(surface, warning, start, end, 5)
+            pygame.draw.line(surface, config.WHITE, start, end, 1)
+        surface.set_clip(old_clip)
+
+
 class PlayerShot(Entity):
     """玩家射出的直线弹，保留上一帧位置供连续碰撞检测。"""
 
@@ -156,16 +240,22 @@ class PlayerShot(Entity):
 
     def draw(
             self, surface: pygame.Surface,
-            sprite: pygame.Surface | None = None) -> None:
-        if sprite is not None:
-            surface.blit(sprite, sprite.get_rect(center=self.pos))
+            sprite: pygame.Surface | None = None,
+            trail: pygame.Surface | None = None) -> None:
+        if sprite is None:
+            width = max(2, int(self.radius * 2))
+            height = max(4, int(self.radius * 4))
+            rect = pygame.Rect(0, 0, width, height)
+            rect.center = (round(self.pos.x), round(self.pos.y))
+            pygame.draw.ellipse(surface, config.CYAN, rect)
             return
 
-        width = max(2, int(self.radius * 2))
-        height = max(4, int(self.radius * 4))
-        rect = pygame.Rect(0, 0, width, height)
-        rect.center = (round(self.pos.x), round(self.pos.y))
-        pygame.draw.ellipse(surface, config.CYAN, rect)
+        cx, cy = self.pos.x, self.pos.y
+        if trail is not None:
+            # 拖尾已烘焙成「弹体 + 彗尾」整图，整体贴到弹体正后方即可
+            offset = (trail.get_height() - sprite.get_height()) / 2
+            surface.blit(trail, trail.get_rect(center=(cx, cy + offset)))
+        surface.blit(sprite, sprite.get_rect(center=(cx, cy)))
 
 
 class Boss(Entity):
@@ -198,13 +288,31 @@ class Boss(Entity):
 
     @property
     def phase(self) -> int:
-        """当前符卡序号（1 起）。把总生命值均分给各张符卡。"""
+        """当前符卡序号（1 起），按每张符卡自己的 HP 划分阶段。"""
         total = self.spell_count
         if total <= 0:
             return 1
-        segment = self.max_hp / total
-        remaining = math.ceil(self.hp / segment) if self.hp > 0.0 else 0
-        return min(total, max(1, total - remaining + 1))
+        later_hp = 0.0
+        for index in range(total):
+            later_hp += self.spec.spells[index].hp
+        for index, spell in enumerate(self.spec.spells):
+            later_hp -= spell.hp
+            if self.hp > later_hp:
+                return index + 1
+        return total
+
+    @property
+    def phase_max_hp(self) -> float:
+        """当前符卡阶段的生命上限。"""
+        return self.spell.hp if self.spec.spells else 0.0
+
+    @property
+    def phase_hp(self) -> float:
+        """当前符卡阶段剩余的生命值，不包含后续阶段的保留生命。"""
+        later_hp = sum(
+            spell.hp for spell in self.spec.spells[self.phase:]
+        )
+        return max(0.0, min(self.phase_max_hp, self.hp - later_hp))
 
     @property
     def spell(self):

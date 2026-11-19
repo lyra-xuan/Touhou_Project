@@ -44,4 +44,4 @@
 - 视觉方向：参考东方幻想弹幕风格，说明书与 HUD 采用哥特描金配绯红。
 - 素材策略：使用用户提供并确认许可的东方红魔乡图片与音效，以及东方音乐包中的 PC-98 原曲转码的背景音乐。
 
-已落地：标题页与说明书（背景说明 / 用语解说 / 操作指南三页）、三关战斗流程与立绘对话、音效与循环背景音乐。素材来源与许可分别登记在 `assets/title/ATTRIBUTION.md`、`assets/gameplay/ATTRIBUTION.md`、`assets/audio/ATTRIBUTION.md` 和 `assets/bgm/ATTRIBUTION.md`；非商业用途本身不等于获得许可，详见 [素材需求](assets.md)。
+已落地：标题页与说明书（背景说明 / 用语解说 / 操作指南三页）、三关战斗流程与立绘对话、音效与循环背景音乐。素材来源与许可分别登记在 `assets/title/ATTRIBUTION.md`、`assets/ATTRIBUTION.md`、`assets/audio/ATTRIBUTION.md` 和 `assets/bgm/ATTRIBUTION.md`；非商业用途本身不等于获得许可，详见 [素材需求](assets.md)。

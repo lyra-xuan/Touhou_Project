@@ -1,11 +1,18 @@
 # Title & Menu Asset Credits
 
+These assets remain the property of their respective rights holders and are
+not covered by this repository's MIT License, which applies to code only.
+
 - `touhou-th06-title.jpg` comes from `TH06 东方红魔乡/TL_DAT/title00.jpg`
   in the user-provided 东方Project素材包. Original artwork copyright is
   © 2002 ZUN. The user confirmed that use in this project is licensed.
 - `music-room.jpg` comes from `TH06 东方红魔乡/TL_DAT/music.jpg`, the original
   音乐室 background of the same title. Copyright © 2002 ZUN; the user confirmed
   that use in this project is licensed.
+- `stage-select.jpg` comes from `TH06 东方红魔乡/TL_DAT/select00.jpg`, the
+  original stage-select background. It is used as the backdrop of the in-game
+  关卡选择 (stage select) screen. Copyright © 2002 ZUN; the user confirmed that
+  use in this project is licensed.
 
 The game displays the original images directly, scaling them to fit the
 1280x960 window. No source artwork was redrawn.

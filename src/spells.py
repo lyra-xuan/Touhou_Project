@@ -77,6 +77,38 @@ class SpellCard:
 
 
 @dataclass(frozen=True)
+class BeamPattern:
+    """一次直线激光攻击的蓄势、宽度、颜色与瞄准偏移。"""
+
+    width: float = 38.0
+    length: float = 1200.0
+    telegraph: float = 0.65
+    duration: float = 1.0
+    color: tuple[int, int, int] = (255, 170, 55)
+    angle_offset: float = 0.0
+    parallel_offset: float = 0.0
+
+
+@dataclass(frozen=True)
+class SpecialSkill:
+    """Boss / 自机的特殊技能：蓄力 → 释放 → 后摇。
+
+    ``charge`` 是蓄力时长（此间不可再次触发），``recover`` 是释放后的硬直，
+    ``radius`` 决定释放瞬间冲击波光环的扩散范围；``emitters`` 是同时释放的
+    专属弹幕组合，``flash_color`` 决定技能闪光的主题色。
+    """
+
+    name: str
+    sprite_key: str                                  # art.py 中的贴图键
+    charge: float = config.SKILL_CHARGE_TIME
+    recover: float = config.SKILL_RECOVER_TIME
+    radius: float = 260.0
+    emitters: tuple[Emitter, ...] = ()
+    flash_color: tuple[int, int, int] = config.PALE_GOLD
+    beams: tuple[BeamPattern, ...] = ()
+
+
+@dataclass(frozen=True)
 class BossSpec:
     """一个可战斗角色的完整规格：立绘键、显示名与符卡列表。"""
 
@@ -84,6 +116,7 @@ class BossSpec:
     title: str
     spells: tuple[SpellCard, ...]
     midboss: bool = False
+    special: SpecialSkill | None = None   # 按血量分档触发的特殊技能
 
     @property
     def max_hp(self) -> float:
@@ -179,23 +212,146 @@ def _spell(name: str, hp: float, duration: float, *emitters: Emitter,
                      flavor=flavor)
 
 
+def _special(
+        name: str, emitters: tuple[Emitter, ...], *,
+        radius: float = 300.0,
+        flash_color: tuple[int, int, int] = config.PALE_GOLD,
+        beams: tuple[BeamPattern, ...] = (),
+        ) -> SpecialSkill:
+    """构造一套由专属弹幕与激光几何组成的 Boss 特殊技能。"""
+    return SpecialSkill(
+        name=name, sprite_key="skill_boss", radius=radius,
+        emitters=emitters, flash_color=flash_color, beams=beams,
+    )
+
+
+# 每个可战斗角色都配一个专属特殊技能，按血量分档触发（见 config.BOSS_SKILL_*）。
+SPECIAL_SKILLS = {
+    "rumia": _special(
+        "闇符「ダークサイドレイ」",
+        (
+            Emitter(kind="fan", count=22, step=4, speed=255,
+                    bullet="large_purple", aim=True, offset=-14),
+            Emitter(kind="fan", count=22, step=4, speed=255,
+                    bullet="mid_red", aim=True, offset=14),
+            Emitter(kind="scatter", count=22, speed=130, speed_max=260,
+                    bullet="small_blue"),
+        ),
+        flash_color=(150, 95, 255),
+        beams=(
+            BeamPattern(width=28, length=1250, telegraph=0.85, duration=0.8,
+                        color=(150, 70, 255), angle_offset=-24),
+            BeamPattern(width=28, length=1250, telegraph=0.85, duration=0.8,
+                        color=(150, 70, 255), angle_offset=24),
+        ),
+    ),
+    "cirno": _special(
+        "氷符「アイシクルフォール」",
+        (
+            Emitter(kind="fan", count=22, step=4, speed=275,
+                    bullet="large_cyan", aim=True, offset=-22),
+            Emitter(kind="fan", count=22, step=4, speed=275,
+                    bullet="large_cyan", aim=True, offset=22),
+            Emitter(kind="scatter", count=22, speed=120, speed_max=275,
+                    bullet="small_white"),
+        ),
+        flash_color=(105, 220, 255),
+        beams=tuple(
+            BeamPattern(width=22, length=1200, telegraph=1.0, duration=0.9,
+                        color=(105, 220, 255), angle_offset=offset)
+            for offset in (-20, 0, 20)
+        ),
+    ),
+    "meiling": _special(
+        "華符「彩光蓮華掌」",
+        (
+            Emitter(kind="fan", count=22, step=4, speed=285,
+                    bullet="mid_red", aim=True, offset=-20),
+            Emitter(kind="fan", count=22, step=4, speed=310,
+                    bullet="small_green", aim=True),
+            Emitter(kind="fan", count=22, step=4, speed=285,
+                    bullet="mid_red", aim=True, offset=20),
+        ),
+        flash_color=(255, 115, 90),
+        beams=(
+            BeamPattern(width=48, length=1150, telegraph=0.65, duration=0.7,
+                        color=(255, 115, 90)),
+        ),
+    ),
+    "patchouli": _special(
+        "火符「アグニシャイン」",
+        (
+            Emitter(kind="fan", count=24, step=5, speed=245,
+                    bullet="large_yellow", aim=True, offset=-12),
+            Emitter(kind="fan", count=24, step=5, speed=245,
+                    bullet="large_purple", aim=True, offset=12),
+            Emitter(kind="scatter", count=22, speed=130, speed_max=270,
+                    bullet="small_red"),
+        ),
+        flash_color=(255, 185, 75),
+        beams=(
+            BeamPattern(width=34, length=1200, telegraph=0.75, duration=0.9,
+                        color=(255, 185, 75), angle_offset=-35),
+            BeamPattern(width=34, length=1200, telegraph=0.75, duration=0.9,
+                        color=(255, 185, 75), angle_offset=35),
+        ),
+    ),
+    "sakuya": _special(
+        "奇術「エターナルミーク」",
+        (
+            Emitter(kind="fan", count=24, step=4, speed=300,
+                    bullet="mid_white", aim=True),
+            Emitter(kind="fan", count=24, step=4, speed=300,
+                    bullet="small_blue", aim=True, offset=180),
+            Emitter(kind="scatter", count=22, speed=150, speed_max=300,
+                    bullet="mid_white"),
+        ),
+        flash_color=(185, 220, 255),
+        beams=tuple(
+            BeamPattern(width=18, length=900, telegraph=0.8, duration=0.6,
+                        color=(185, 220, 255), angle_offset=offset)
+            for offset in (0, 90, 180, 270)
+        ),
+    ),
+    "remilia": _special(
+        "冥符「深紅の王威」",
+        (
+            Emitter(kind="fan", count=26, step=4, speed=315,
+                    bullet="large_magenta", aim=True),
+            Emitter(kind="spiral", count=24, speed=250, spin=17,
+                    bullet="small_purple"),
+            Emitter(kind="scatter", count=24, speed=150, speed_max=330,
+                    bullet="large_red"),
+        ),
+        radius=340.0,
+        flash_color=(255, 55, 95),
+        beams=tuple(
+            BeamPattern(width=50, length=1350, telegraph=0.75, duration=1.1,
+                        color=(255, 55, 95), parallel_offset=offset)
+            for offset in (-68, 0, 68)
+        ),
+    ),
+}
+
+
 DEFAULT_BOSS_SPEC = BossSpec(
     key="remilia",
     title="蕾米莉亚·史卡雷特",
+    special=SPECIAL_SKILLS["remilia"],
     spells=(
-        _spell("红符「猩红射击」", 180.0, _BOSS_DURATION,
+        _spell("红符「猩红射击」", 650.0, _BOSS_DURATION,
                Emitter(kind="fan", interval=0.70, count=5, step=12.0,
                        speed=232.5, bullet="small_red", aim=True),
                Emitter(kind="ring", interval=1.45, count=10, speed=170.0,
                        spin=9.0, bullet="small_blue"),
                flavor="以猩红之弹直指巫女，再以蓝弹之环封锁退路。"),
-        _spell("红魔法「红色魔术」", 180.0, _BOSS_DURATION,
+        _spell("红魔法「红色魔术」", 850.0, _BOSS_DURATION,
                Emitter(kind="ring", interval=1.10, count=8, speed=225.0,
                        bullet="large_magenta"),
                Emitter(kind="ring", interval=1.10, count=16, offset=180.0 / 16,
                        speed=162.0, bullet="small_white"),
                flavor="大小双层弹环交错旋转，将战场染成一片赤红。"),
-        _spell("神枪「冈格尼尔之枪」", 180.0, _BOSS_DURATION,
+        _spell("神枪「冈格尼尔之枪」", 1100.0, _BOSS_DURATION,
                Emitter(kind="spiral", interval=0.13, count=6, speed=232.5,
                        spin=17.0, bullet="small_blue"),
                Emitter(kind="scatter", interval=0.60, count=4, speed=120.0,
@@ -208,6 +364,7 @@ DEFAULT_BOSS_SPEC = BossSpec(
 MIDBOSS_SPECS = {
     "rumia": BossSpec(
         key="rumia", title="露米娅", midboss=True,
+        special=SPECIAL_SKILLS["rumia"],
         spells=(
             _spell("闇符「黑暗侧之月」", config.MIDBOSS_HP, _MID_DURATION,
                    Emitter(kind="fan", interval=0.95, count=5, step=11.0,
@@ -219,6 +376,7 @@ MIDBOSS_SPECS = {
     ),
     "cirno": BossSpec(
         key="cirno", title="琪露诺", midboss=True,
+        special=SPECIAL_SKILLS["cirno"],
         spells=(
             _spell("冰符「冰柱坠落」", config.MIDBOSS_HP, _MID_DURATION,
                    Emitter(kind="fan", interval=0.85, count=7, step=14.0,
@@ -230,6 +388,7 @@ MIDBOSS_SPECS = {
     ),
     "meiling": BossSpec(
         key="meiling", title="红美铃", midboss=True,
+        special=SPECIAL_SKILLS["meiling"],
         spells=(
             _spell("华符「芳华绚烂」", config.MIDBOSS_HP, _MID_DURATION,
                    Emitter(kind="spiral", interval=0.22, count=5, speed=190.0,
@@ -241,6 +400,7 @@ MIDBOSS_SPECS = {
     ),
     "patchouli": BossSpec(
         key="patchouli", title="帕秋莉·诺蕾姬", midboss=True,
+        special=SPECIAL_SKILLS["patchouli"],
         spells=(
             _spell("火符「阿耆尼之辉」", config.MIDBOSS_HP, _MID_DURATION,
                    Emitter(kind="ring", interval=0.95, count=12, speed=185.0,
@@ -252,6 +412,7 @@ MIDBOSS_SPECS = {
     ),
     "sakuya": BossSpec(
         key="sakuya", title="十六夜咲夜", midboss=True,
+        special=SPECIAL_SKILLS["sakuya"],
         spells=(
             _spell("奇术「误导」", config.MIDBOSS_HP, _MID_DURATION,
                    Emitter(kind="fan", interval=0.55, count=9, step=8.0,
@@ -267,20 +428,21 @@ MIDBOSS_SPECS = {
 STAGE_BOSS_SPECS = {
     "rumia": BossSpec(
         key="rumia", title="露米娅",
+        special=SPECIAL_SKILLS["rumia"],
         spells=(
-            _spell("闇符「黑暗侧之月」", 180.0, _BOSS_DURATION,
+            _spell("闇符「黑暗侧之月」", 650.0, _BOSS_DURATION,
                    Emitter(kind="ring", interval=1.00, count=10, speed=205.0,
                            spin=8.0, bullet="small_white"),
                    Emitter(kind="fan", interval=1.55, count=6, step=13.0,
                            speed=245.0, bullet="small_red", aim=True),
                    flavor="白弹之环缓缓旋转，红弹扇形自暗处直取性命。"),
-            _spell("夜符「夜雀」", 180.0, _BOSS_DURATION,
+            _spell("夜符「夜雀」", 850.0, _BOSS_DURATION,
                    Emitter(kind="spiral", interval=0.16, count=4, speed=215.0,
                            spin=19.0, bullet="large_purple"),
                    Emitter(kind="scatter", interval=0.75, count=5, speed=140.0,
                            speed_max=250.0, bullet="small_blue"),
                    flavor="紫弹螺旋如夜雀振翅，蓝弹四散扰乱听觉。"),
-            _spell("闇符「分界」", 180.0, _BOSS_DURATION,
+            _spell("闇符「分界」", 1100.0, _BOSS_DURATION,
                    Emitter(kind="ring", interval=0.85, count=18, speed=175.0,
                            spin=-11.0, bullet="small_gray"),
                    Emitter(kind="fan", interval=0.50, count=3, step=22.0,
@@ -290,20 +452,21 @@ STAGE_BOSS_SPECS = {
     ),
     "cirno": BossSpec(
         key="cirno", title="琪露诺",
+        special=SPECIAL_SKILLS["cirno"],
         spells=(
-            _spell("冰符「冰柱坠落」", 180.0, _BOSS_DURATION,
+            _spell("冰符「冰柱坠落」", 650.0, _BOSS_DURATION,
                    Emitter(kind="fan", interval=0.62, count=7, step=13.0,
                            speed=235.0, bullet="large_cyan", aim=True),
                    Emitter(kind="ring", interval=1.35, count=8, speed=160.0,
                            spin=-9.0, bullet="small_white"),
                    flavor="巨大冰柱扇形坠下，白冰之环逆时针封锁全场。"),
-            _spell("雹符「冰雹风暴」", 180.0, _BOSS_DURATION,
+            _spell("雹符「冰雹风暴」", 900.0, _BOSS_DURATION,
                    Emitter(kind="scatter", interval=0.30, count=6, speed=110.0,
                            speed_max=260.0, bullet="small_blue"),
                    Emitter(kind="ring", interval=1.80, count=12, speed=140.0,
                            spin=6.0, bullet="mid_white"),
                    flavor="冰雹暴风肆虐，蓝白乱弹交织成冰之牢笼。"),
-            _spell("雪符「钻石暴风雪」", 180.0, _BOSS_DURATION,
+            _spell("雪符「钻石暴风雪」", 1150.0, _BOSS_DURATION,
                    Emitter(kind="spiral", interval=0.12, count=6, speed=225.0,
                            spin=-21.0, bullet="small_white"),
                    Emitter(kind="ring", interval=1.60, count=6, speed=130.0,
@@ -313,14 +476,15 @@ STAGE_BOSS_SPECS = {
     ),
     "remilia": BossSpec(
         key="remilia", title="蕾米莉亚·史卡雷特",
+        special=SPECIAL_SKILLS["remilia"],
         spells=(
-            _spell("红符「猩红射击」", 320.0, _BOSS_DURATION,
+            _spell("红符「猩红射击」", 1000.0, _BOSS_DURATION,
                    Emitter(kind="fan", interval=0.55, count=9, step=10.0,
                            speed=255.0, bullet="small_red", aim=True),
                    Emitter(kind="ring", interval=1.30, count=14, speed=175.0,
                            spin=10.0, bullet="small_blue"),
                    flavor="猩红弹幕直指巫女，蓝弹之环封住一切退路。"),
-            _spell("红魔法「红色魔术」", 360.0, _BOSS_DURATION,
+            _spell("红魔法「红色魔术」", 1200.0, _BOSS_DURATION,
                    Emitter(kind="ring", interval=0.80, count=12, speed=215.0,
                            bullet="large_magenta"),
                    Emitter(kind="ring", interval=0.80, count=20, offset=180.0 / 20,
@@ -328,7 +492,7 @@ STAGE_BOSS_SPECS = {
                    Emitter(kind="fan", interval=1.50, count=5, step=14.0,
                            speed=270.0, bullet="mid_red", aim=True),
                    flavor="大小双层魔弹交错，红弹扇形点缀其间。"),
-            _spell("冥符「红色的冥界」", 400.0, _BOSS_DURATION,
+            _spell("冥符「红色的冥界」", 1400.0, _BOSS_DURATION,
                    Emitter(kind="spiral", interval=0.09, count=6, speed=225.0,
                            spin=15.0, bullet="small_purple"),
                    Emitter(kind="scatter", interval=0.65, count=8, speed=140.0,
@@ -336,7 +500,7 @@ STAGE_BOSS_SPECS = {
                    Emitter(kind="ring", interval=1.80, count=16, speed=190.0,
                            spin=-8.0, bullet="small_red"),
                    flavor="冥界紫弹螺旋不绝，红弹之环倒卷而回。"),
-            _spell("神罚「年幼的恶魔之王」", 440.0, _BOSS_DURATION,
+            _spell("神罚「年幼的恶魔之王」", 1600.0, _BOSS_DURATION,
                    Emitter(kind="spiral", interval=0.07, count=8, speed=240.0,
                            spin=12.0, bullet="small_purple"),
                    Emitter(kind="fan", interval=0.85, count=7, step=13.0,
@@ -344,7 +508,7 @@ STAGE_BOSS_SPECS = {
                    Emitter(kind="ring", interval=1.20, count=10, speed=200.0,
                            spin=16.0, bullet="large_cyan"),
                    flavor="王罚之螺旋覆盖天际，红弹与冰环交错降下神罚。"),
-            _spell("神枪「冈格尼尔之枪」", 480.0, _BOSS_DURATION,
+            _spell("神枪「冈格尼尔之枪」", 1800.0, _BOSS_DURATION,
                    Emitter(kind="fan", interval=0.15, count=5, step=4.0,
                            speed=340.0, bullet="large_cyan", aim=True),
                    Emitter(kind="ring", interval=1.05, count=12, speed=185.0,

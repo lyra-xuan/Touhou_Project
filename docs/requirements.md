@@ -46,7 +46,7 @@
 9. [已完成] 美术与音效强化：东方红魔乡背景/自机/Boss/弹幕/特效素材、可击破杂兵、10 个音效与四首循环背景音乐。
 10. [已完成] 说明书页：东方口吻的背景说明、世界观用语解说与操作指南三页，哥特描金边框与绯红页签。
 
-不扩展多个可玩角色、机体/射击类型选择、Replay 或复杂剧情分支。东方作品的角色、立绘、音乐和游戏内图像素材仅在许可覆盖本项目使用时引入；标题、战斗图片、音效与背景音乐的来源及许可分别登记在 `assets/title/ATTRIBUTION.md`、`assets/gameplay/ATTRIBUTION.md`、`assets/audio/ATTRIBUTION.md` 与 `assets/bgm/ATTRIBUTION.md`。
+不扩展多个可玩角色、机体/射击类型选择、Replay 或复杂剧情分支。东方作品的角色、立绘、音乐和游戏内图像素材仅在许可覆盖本项目使用时引入；标题、战斗图片、音效与背景音乐的来源及许可分别登记在 `assets/title/ATTRIBUTION.md`、`assets/ATTRIBUTION.md`、`assets/audio/ATTRIBUTION.md` 与 `assets/bgm/ATTRIBUTION.md`。
 
 ## 验收标准
 

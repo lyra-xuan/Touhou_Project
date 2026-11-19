@@ -1,3 +1,4 @@
+import math
 import unittest
 from types import SimpleNamespace
 
@@ -5,7 +6,7 @@ import pygame
 from pygame.math import Vector2
 
 from src import collision, config
-from src.entities import Bullet, Player
+from src.entities import BossBeam, Bullet, Player
 from src.game import Game
 
 
@@ -37,6 +38,9 @@ class CollisionSweepTests(unittest.TestCase):
         game.score = 0
         game.hiscore = 10 ** 9
         game.graze_fx_cooldown = 0.0
+        game.screen_shake = 0.0
+        game.skill_state = "ready"
+        game.skill_timer = 0.0
         return game
 
     def test_swept_graze_crossing_grid_boundary_is_not_filtered(self) -> None:
@@ -62,6 +66,22 @@ class CollisionSweepTests(unittest.TestCase):
 
         self.assertEqual(game.hit_total, 1)
         self.assertFalse(bullet.alive)
+
+    def test_active_boss_beam_hits_the_player(self) -> None:
+        player = Player(240.0, 560.0)
+        player.prev_pos = Vector2(player.pos)
+        game = self.make_game(player, [])
+        game.boss_beams = [
+            BossBeam(
+                240.0, 420.0, math.pi / 2, 220.0, 38.0, 0.0, 1.0,
+                (255, 170, 55),
+            )
+        ]
+
+        game._check_collisions()
+
+        self.assertEqual(game.hit_total, 1)
+        self.assertEqual(game.lives, config.PLAYER_LIVES - 1)
 
 
 if __name__ == "__main__":
